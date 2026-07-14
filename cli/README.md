@@ -1,7 +1,10 @@
 # Privilege Shield CLI
 
 Lokale **Stapel-Pseudonymisierung** (Deutsch / Deutsch-Schweiz / English).  
+Formate: `.txt` / `.md` / `.csv` / … und **`.docx` (Textlayer)**.  
 Gleiche Trust-Idee wie das Browser-Tool: Dokumente und Key verlassen Ihren Rechner nicht.
+
+Ausführlicher Cursor-Agent-Flow: [`../workflow/CURSOR-AGENT.md`](../workflow/CURSOR-AGENT.md).
 
 ## Verhalten
 

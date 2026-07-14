@@ -20,10 +20,15 @@ const TEXT_EXTS = new Set([
   ".xml",
   ".rtf",
   ".log",
+  ".docx", // OOXML text-layer (handled separately for read/write)
 ]);
 
 export function isTextPath(p) {
   return TEXT_EXTS.has(extname(p).toLowerCase());
+}
+
+export function isDocxPath(p) {
+  return extname(p).toLowerCase() === ".docx";
 }
 
 /** Expand file/dir args into a flat list of text files. */

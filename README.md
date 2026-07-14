@@ -69,28 +69,27 @@ Steuerpflichtige(r), …) stay as labels.
 **Not supported in v1:** PDFs (hidden text-layer and metadata failure modes — out of
 scope on purpose). Text only.
 
-## Batch CLI (Deutsch / Schweiz + English)
+## Batch CLI + Cursor Agent (Deutsch / Schweiz + English)
 
-For large folders, use the local CLI under [`cli/`](cli/) — offline, shared
-**pseudonyms** across files (with an interactive prompt), DE/CH detectors
-(IBAN, Aktenzeichen, Straße, `gegen`, umlauts, €/**CHF**, `+41`, Swiss dates
-`TT.MM.JJJJ` / `T.M.JJJJ`). **Dates are left unchanged.** Verfahrensrollen
-(Beschwerdeführer, Rekurrent, Steuerpflichtige(r), …) stay as labels.
+Local CLI under [`cli/`](cli/): `.txt` / `.md` / **`.docx` text-layer**, shared
+tokens across related files, DE/CH detectors. **Dates unchanged by default.**
 
 ```bash
-cd cli
+cd cli && npm install
 node bin/privilege-shield.js anonymize ../inbox/ \
   --out ../redacted/ \
-  --key ../secrets/ps-key.json
+  --key ../secrets/ps-key.json \
+  --auto
 
-# Cursor agent: work only on redacted/ — never clone cleartext or the key
+# Only redacted/ → Cursor agent. Restore locally — never in the cloud:
 node bin/privilege-shield.js deanonymize ../redacted/ \
   --out ../restored/ \
   --key ../secrets/ps-key.json
 ```
 
-See [`cli/README.md`](cli/README.md). The key maps pseudonym → real value — keep it
-outside any repo a cloud agent can access.
+Full workflow: [`workflow/CURSOR-AGENT.md`](workflow/CURSOR-AGENT.md).  
+Agent rules: [`.cursor/rules/privilege-shield-redacted.mdc`](.cursor/rules/privilege-shield-redacted.mdc).  
+Key = secret (Vault / `secrets/`) — never commit, never show the agent.
 
 ---
 

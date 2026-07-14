@@ -182,6 +182,7 @@ export function collectPendingAcrossFiles(fileTexts, options = {}) {
   const existingByKey = options.existingByKey || {};
   const sessionMap = options.sessionMap || {};
   const itemSeqRef = options.itemSeqRef || { n: 0 };
+  const style = options.style || "pseudo";
   const pending = [];
   const seen = new Set(Object.keys(existingByKey));
 
@@ -192,7 +193,13 @@ export function collectPendingAcrossFiles(fileTexts, options = {}) {
       if (it.type === "date") continue;
       if (seen.has(it.key) || existingByKey[it.key]) continue;
       seen.add(it.key);
-      const suggestion = suggestPseudonym(it.type, it.value, counters);
+      let suggestion;
+      if (style === "placeholders") {
+        counters[it.type] = (counters[it.type] || 0) + 1;
+        suggestion = "[" + TYPES[it.type].prefix + "_" + counters[it.type] + "]";
+      } else {
+        suggestion = suggestPseudonym(it.type, it.value, counters);
+      }
       pending.push({
         key: it.key,
         type: it.type,

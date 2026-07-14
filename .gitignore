@@ -9,4 +9,9 @@ inbox/
 cleartext/
 restored/
 .redacted-work/
-node_modules/
+cli/node_modules/
+
+# Local map drafts that might contain real names before redaction
+*.map.local
+names.map
+
