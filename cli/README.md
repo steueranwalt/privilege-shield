@@ -57,7 +57,17 @@ node bin/privilege-shield.js deanonymize ../redacted/ \
 | `deanonymize` | Pseudonyme anhand des Keys zurücksetzen |
 | `scan` | Vorschau ohne Schreiben |
 
-Wichtige Optionen: `--auto` / `-y`, `--interactive` / `-i`, `--enable-dates` (nicht empfohlen), `--placeholders` (altes `[TYPE_n]`), `--terms`, `--disable`.
+Wichtige Optionen: `--auto` / `-y`, `--interactive` / `-i`, `--map-file`, `--enable-dates` (nicht empfohlen), `--placeholders` (altes `[TYPE_n]`), `--terms`, `--disable`.
+
+### `--map-file` (Vorab-Pseudonyme)
+
+```text
+# names.map — Klartext => Pseudonym
+Klaus-Peter Müller => Alex Beispiel
+klaus.mueller@beispiel.ch => mail@beispiel.ch
+```
+
+oder JSON `{ "Klaus-Peter Müller": "Alex Beispiel" }`. Treffer werden vor der Abfrage gesetzt; der Rest wird interaktiv (oder mit `--auto`) ergänzt.
 
 ## Tests
 

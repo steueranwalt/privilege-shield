@@ -106,3 +106,38 @@ export function loadTermsFile(path) {
   if (!path) return [];
   return parseTermsArg(readFileSync(path, "utf8"));
 }
+
+/**
+ * Load a predeclared real→pseudonym map.
+ * Accepts JSON `{ "Real Name": "Alex Berner", ... }` or text lines:
+ *   Real Name => Alex Berner
+ *   Real Name = Alex Berner
+ * Returns { byReal: Map-like object, overrides for engine keys filled later }.
+ */
+export function loadMapFile(path) {
+  if (!path) return {};
+  const raw = readFileSync(path, "utf8").trim();
+  if (!raw) return {};
+  if (raw.startsWith("{")) {
+    const obj = JSON.parse(raw);
+    if (obj && typeof obj === "object" && obj.map && typeof obj.map === "object") {
+      // key-file style (pseudo → real) — invert
+      const inv = {};
+      for (const [pseudo, real] of Object.entries(obj.map)) inv[real] = pseudo;
+      return inv;
+    }
+    return obj;
+  }
+  const out = {};
+  for (const line of raw.split(/\n/)) {
+    const t = line.trim();
+    if (!t || t.startsWith("#")) continue;
+    const m = t.split(/\s*=>\s*|\s*=\s*/);
+    if (m.length >= 2) {
+      const real = m[0].trim();
+      const pseudo = m.slice(1).join("=").trim();
+      if (real && pseudo) out[real] = pseudo;
+    }
+  }
+  return out;
+}

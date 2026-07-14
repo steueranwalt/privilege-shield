@@ -1,6 +1,6 @@
 import { describe, it, before, after } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync, readFileSync, existsSync } from "node:fs";
+import { mkdtempSync, rmSync, readFileSync, existsSync, writeFileSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
@@ -66,5 +66,35 @@ describe("CLI batch anonymize / deanonymize", () => {
     assert.equal(summary.files, 1);
     assert.equal(summary.datesLeftIntact, true);
     assert.ok(summary.uniquePseudonyms > 3);
+  });
+
+  it("honors --map-file predeclared pseudonyms", () => {
+    const mapPath = join(dir, "names.map");
+    writeFileSync(
+      mapPath,
+      "Klaus-Peter Müller => Alex Beispiel\nklaus.mueller@beispiel.ch => mail@beispiel.ch\n"
+    );
+    const out = join(dir, "mapped");
+    const key = join(dir, "secrets", "map-key.json");
+    const a = run(
+      [
+        "anonymize",
+        join(fixtures, "ch-sample.txt"),
+        "--out",
+        out,
+        "--key",
+        key,
+        "--map-file",
+        mapPath,
+        "--auto",
+        "--json",
+      ],
+      dir
+    );
+    assert.equal(a.status, 0, a.stderr + a.stdout);
+    const text = readFileSync(join(out, "ch-sample.redacted.txt"), "utf8");
+    assert.ok(text.includes("Alex Beispiel"), text);
+    assert.ok(text.includes("mail@beispiel.ch"), text);
+    assert.ok(!text.includes("Klaus-Peter Müller"));
   });
 });

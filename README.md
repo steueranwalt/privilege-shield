@@ -55,10 +55,16 @@ vercel deploy privilege-shield --prod
 
 ## What it detects (v1)
 
-Names (capitalized sequences, `Mr./Dr.` titles, `X v. Y` party captions), SSNs,
-emails, phone numbers, street addresses, ZIPs, dates, account/routing numbers,
-case/docket numbers, and dollar amounts. Same value → same placeholder every time,
-which is what makes restore reliable.
+Names (including umlauts, `Herr/Frau/Dr.`, `X v. Y` / `X gegen Y`), SSNs / IdNr,
+IBAN, emails, phones (US / `+49` / `+41`), street addresses (EN + Straße/Str.),
+PLZ/ZIP, **dates off by default**, account numbers, Aktenzeichen/dockets, and
+amounts in `$` / `€` / **CHF**. Same value → same placeholder every time, which is
+what makes restore reliable.
+
+**Detection (browser + CLI):** English and German/Swiss — IBAN, Aktenzeichen, Straße,
+`gegen`, umlaut names, €/CHF, `+41`, Swiss dates `TT.MM.JJJJ` / `T.M.JJJJ`. **Dates are
+off by default** (left in cleartext). Verfahrensrollen (Beschwerdeführer, Rekurrent,
+Steuerpflichtige(r), …) stay as labels.
 
 **Not supported in v1:** PDFs (hidden text-layer and metadata failure modes — out of
 scope on purpose). Text only.

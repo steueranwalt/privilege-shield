@@ -19,8 +19,10 @@ import {
   commonRoot,
   parseTermsArg,
   loadTermsFile,
+  loadMapFile,
 } from "../lib/io.js";
 import { promptPseudonyms } from "../lib/prompt.js";
+import { uniquifyPseudo } from "../lib/pseudos.js";
 import { DEFAULT_ENABLED, TOGGLEABLE } from "../lib/types.js";
 
 const HELP = `
@@ -36,6 +38,7 @@ OPTIONS
   --key, -k <file>      Sitzungs-Key JSON (Secret; speichert Pseudonym → Klartext)
   --terms <a,b,c>       Zusätzliche Begriffe, die immer ersetzt werden
   --terms-file <path>   Datei mit Begriffen (Komma oder Zeilenumbruch)
+  --map-file <path>     Vorab-Zuordnung Klartext → Pseudonym (JSON oder „A => B“-Zeilen)
   --disable <types>     Typen abschalten: ${TOGGLEABLE.join(",")}
   --enable-dates        Daten UND Datumsformen trotzdem ersetzen (Standard: Daten bleiben)
   --auto, -y            Keine Abfrage — vorgeschlagene Pseudonyme übernehmen
@@ -73,6 +76,7 @@ function parseArgs(argv) {
     key: null,
     terms: [],
     termsFile: null,
+    mapFile: null,
     disable: [],
     suffix: null,
     dryRun: false,
@@ -96,6 +100,7 @@ function parseArgs(argv) {
     else if (x === "--key" || x === "-k") args.key = a.shift();
     else if (x === "--terms") args.terms = parseTermsArg(a.shift());
     else if (x === "--terms-file") args.termsFile = a.shift();
+    else if (x === "--map-file") args.mapFile = a.shift();
     else if (x === "--disable")
       args.disable = (a.shift() || "")
         .split(",")
@@ -213,6 +218,12 @@ async function cmdAnonymize(args) {
 
   const fileTexts = files.map((file) => ({ file, text: readText(file) }));
 
+  // Optional predeclared Klartext → Pseudonym map (skip prompt for those)
+  const mapFile = loadMapFile(args.mapFile);
+  if (Object.keys(mapFile).length) {
+    console.error(`Map-Datei geladen: ${Object.keys(mapFile).length} Zuordnung(en)`);
+  }
+
   // Phase 1: collect novel entities, then ask for pseudonyms
   const { pending, counters } = collectPendingAcrossFiles(fileTexts, {
     enabled,
@@ -223,10 +234,25 @@ async function cmdAnonymize(args) {
   });
   session.counters = counters;
 
+  // Apply --map-file matches (exact real value) before interactive prompt
+  const preassigned = {};
+  const stillPending = [];
+  for (const p of pending) {
+    if (Object.prototype.hasOwnProperty.call(mapFile, p.value)) {
+      const pseudo = uniquifyPseudo(mapFile[p.value], session.map);
+      preassigned[p.key] = pseudo;
+      session.byKey[p.key] = pseudo;
+      session.map[pseudo] = p.value;
+    } else {
+      stillPending.push(p);
+    }
+  }
+
   const wantPrompt = args.interactive || (!args.auto && !args.json);
-  const overrides = await promptPseudonyms(pending, {
+  const prompted = await promptPseudonyms(stillPending, {
     auto: !wantPrompt || args.auto,
   });
+  const overrides = { ...preassigned, ...prompted };
 
   const written = [];
   for (const { file, text } of fileTexts) {
