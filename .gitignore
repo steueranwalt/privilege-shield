@@ -1,2 +1,17 @@
 .DS_Store
 .vercel
+
+# Privilege Shield CLI — never commit secrets or cleartext client corpora
+secrets/
+*.ps-key.json
+**/ps-key.json
+inbox/
+cleartext/
+restored/
+.redacted-work/
+cli/node_modules/
+
+# Local map drafts that might contain real names before redaction
+*.map.local
+names.map
+

@@ -1,0 +1,23 @@
+{
+  "name": "privilege-shield-cli",
+  "version": "1.0.0",
+  "description": "Local batch pseudonymization for Privilege Shield — English + German, offline, no uploads.",
+  "type": "module",
+  "bin": {
+    "privilege-shield": "./bin/privilege-shield.js"
+  },
+  "scripts": {
+    "test": "node --test test/*.test.js",
+    "anonymize": "node ./bin/privilege-shield.js anonymize",
+    "deanonymize": "node ./bin/privilege-shield.js deanonymize",
+    "scan": "node ./bin/privilege-shield.js scan"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "license": "MIT",
+  "private": true,
+  "dependencies": {
+    "jszip": "^3.10.1"
+  }
+}

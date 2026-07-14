@@ -410,56 +410,71 @@
 /* --- type metadata: placeholder prefix, label, swatch color, overlap priority.
    Higher priority wins when two detections overlap. ------------------------ */
 const TYPES = {
-  term:    {prefix:"TERM",     label:"Your term",     color:"#ffb86b", priority:140},
-  other:   {prefix:"REDACTED", label:"Manual",        color:"#aeb6c7", priority:130},
-  email:   {prefix:"EMAIL",    label:"Email",         color:"#79d3a4", priority:100},
-  ssn:     {prefix:"SSN",      label:"SSN",           color:"#ff9c8f", priority:95},
-  phone:   {prefix:"PHONE",    label:"Phone",         color:"#79d3a4", priority:90},
-  case:    {prefix:"CASE",     label:"Case/Docket",   color:"#ff9c8f", priority:88},
-  date:    {prefix:"DATE",     label:"Date",          color:"#b79cff", priority:86},
-  account: {prefix:"ACCOUNT",  label:"Account/Routing",color:"#ff9c8f",priority:85},
-  money:   {prefix:"AMOUNT",   label:"Dollar amount", color:"#7ed4e8", priority:80},
-  address: {prefix:"ADDRESS",  label:"Address",       color:"#ffce7a", priority:70},
-  name:    {prefix:"CLIENT",   label:"Name",          color:"#8fb4ff", priority:50},
+  term:    {prefix:"TERM",     label:"Your term",          color:"#ffb86b", priority:140},
+  other:   {prefix:"REDACTED", label:"Manual",             color:"#aeb6c7", priority:130},
+  email:   {prefix:"EMAIL",    label:"Email",              color:"#79d3a4", priority:100},
+  ssn:     {prefix:"SSN",      label:"SSN / IdNr / AHV",   color:"#ff9c8f", priority:95},
+  iban:    {prefix:"IBAN",     label:"IBAN",               color:"#ff9c8f", priority:93},
+  phone:   {prefix:"PHONE",    label:"Phone",              color:"#79d3a4", priority:90},
+  case:    {prefix:"CASE",     label:"Case / Aktenzeichen",color:"#ff9c8f", priority:88},
+  date:    {prefix:"DATE",     label:"Date (off by default)", color:"#b79cff", priority:86},
+  account: {prefix:"ACCOUNT",  label:"Account/Routing",    color:"#ff9c8f", priority:85},
+  money:   {prefix:"AMOUNT",   label:"Amount ($/€/CHF)",   color:"#7ed4e8", priority:80},
+  address: {prefix:"ADDRESS",  label:"Address",            color:"#ffce7a", priority:70},
+  name:    {prefix:"CLIENT",   label:"Name",               color:"#8fb4ff", priority:50},
   entity:  {prefix:"ENTITY",   label:"Possible name/entity", color:"#a9c2ff", priority:45},
-  zip:     {prefix:"ZIP",      label:"ZIP",           color:"#ffce7a", priority:40},
+  zip:     {prefix:"ZIP",      label:"ZIP / PLZ",          color:"#ffce7a", priority:40},
 };
 /* Which categories the user can toggle on/off before detecting.
-   (term is always-on via the "Your terms" box; other is manual-only.) */
-const TOGGLEABLE = ["name","entity","ssn","email","phone","address","zip","date","account","case","money"];
+   (term is always-on via the "Your terms" box; other is manual-only.)
+   Dates stay OFF by default — calendar forms (TT.MM.JJJJ / T.M.JJJJ) remain clear. */
+const TOGGLEABLE = ["name","entity","ssn","iban","email","phone","address","zip","date","account","case","money"];
+const DEFAULT_OFF = new Set(["date"]);
 
 /* ---------------------------------------------------------------------------
    DETECTORS — each returns an array of {type,start,end,value} for a given text.
    They deliberately over-detect; the human review removes false positives.
    --------------------------------------------------------------------------- */
 
-/* Structured, regex-based detectors. */
+/* Structured, regex-based detectors (EN + DE/CH). */
+const DE_MONTHS = "Januar|Februar|März|Maerz|April|Mai|Juni|Juli|August|September|Oktober|November|Dezember";
+const EN_MONTHS = "January|February|March|April|May|June|July|August|September|October|November|December|Jan|Feb|Mar|Apr|Jun|Jul|Aug|Sept?|Oct|Nov|Dec";
 const REGEX_DETECTORS = [
   {type:"email",  re:/\b[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}\b/g},
   {type:"ssn",    re:/\b\d{3}[-\s]\d{2}[-\s]\d{4}\b/g},
-  // phone: optional +1, area code with/without parens, common separators
+  {type:"ssn",    re:/\b(?:Steuer[- ]?(?:ID|Identifikationsnummer|IdNr\.?)|IdNr\.?)\s*[:#]?\s*\d{2}\s?\d{3}\s?\d{3}\s?\d{3}\b/gi},
+  {type:"iban",   re:/\b[A-Z]{2}\d{2}(?:[ ]?[A-Z0-9]{4}){3,7}[ ]?[A-Z0-9]{0,4}\b/g,
+                  valid:m=>{const c=m.replace(/\s+/g,""); return c.length>=15&&c.length<=34;}},
+  // phone: US + DE (+49) + CH (+41)
   {type:"phone",  re:/(?:\+?1[\s.\-]?)?(?:\(\d{3}\)|\d{3})[\s.\-]?\d{3}[\s.\-]?\d{4}\b/g,
                   valid:m=>((m.match(/\d/g)||[]).length===10||(m.match(/\d/g)||[]).length===11)},
-  // case / docket numbers like 3:25-cv-01199, plus "Case No. ..." captions
+  {type:"phone",  re:/(?:\+(?:49|41)[\s.\-\/]?|0)(?:\(?\d{2,5}\)?[\s.\-\/]?)?\d{3,8}(?:[\s.\-\/]?\d{2,8}){0,3}\b/g,
+                  valid:m=>{const d=(m.match(/\d/g)||[]).length; return d>=7&&d<=15;}},
   {type:"case",   re:/\b\d{1,2}:\d{2}-[A-Za-z]{2,4}-\d{3,6}\b/g},
   {type:"case",   re:/\b(?:Case|Docket|Civil Action)\s*(?:No\.?|Number)?\s*[:#]?\s*[\dA-Za-z][\dA-Za-z\-:]{3,}\b/g},
-  // money: $1,200 · $20B · $20.5M · $20 billion · 20 million dollars
+  {type:"case",   re:/\b(?:Az\.?|Aktenzeichen)\s*[:#]?\s*[\dA-Za-z][\dA-Za-z\.\/\-]{2,}\b/gi},
+  {type:"case",   re:/\b\d{1,3}\s?[A-Za-z]{1,4}\s?\d{1,5}\/\d{2,4}\b/g},
+  // money: $ / € / EUR / CHF / Fr.
   {type:"money",  re:/\$\s?\d[\d,]*(?:\.\d+)?(?:\s?(?:hundred|thousand|million|billion|trillion|bn|mn|[kmbt]))?\b/gi},
   {type:"money",  re:/\b\d[\d,]*(?:\.\d+)?\s?(?:hundred|thousand|million|billion|trillion)\s+dollars?\b/gi},
-  // dates: numeric m/d/y, ISO y-m-d, "Month D, YYYY", "Month YYYY", year ranges, and BARE YEARS
+  {type:"money",  re:/(?:€|EUR)\s?\d{1,3}(?:[.\s]\d{3})*(?:,\d{2})?|\d{1,3}(?:[.\s]\d{3})*(?:,\d{2})?\s?(?:€|EUR|Euro|Euros)\b/gi},
+  {type:"money",  re:/(?:CHF|Fr\.?)\s?'?\s?\d{1,3}(?:[’'`.\s]\d{3})*(?:[.,]\d{2})?|\d{1,3}(?:[’'`.\s]\d{3})*(?:[.,]\d{2})?\s?(?:CHF|Fr\.?)\b/gi},
+  // dates EN + DE/CH (off by default): TT.MM.JJJJ, T.M.JJJJ, 14. Juli 1982
   {type:"date",   re:/\b(?:0?[1-9]|1[0-2])[\/\-](?:0?[1-9]|[12]\d|3[01])[\/\-](?:\d{4}|\d{2})\b/g},
   {type:"date",   re:/\b\d{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\d|3[01])\b/g},
-  {type:"date",   re:/\b(?:January|February|March|April|May|June|July|August|September|October|November|December|Jan|Feb|Mar|Apr|Jun|Jul|Aug|Sept?|Oct|Nov|Dec)\.?\s+\d{1,2}(?:st|nd|rd|th)?,?\s+\d{4}\b/gi},
-  {type:"date",   re:/\b(?:January|February|March|April|May|June|July|August|September|October|November|December|Jan|Feb|Mar|Apr|Jun|Jul|Aug|Sept?|Oct|Nov|Dec)\.?\s+(?:19|20)\d{2}\b/gi},
-  {type:"date",   re:/\b(?:19|20)\d{2}\s?(?:[-–—]|to)\s?(?:19|20)?\d{2}\b/g},  // year range 2018-2020
-  {type:"date",   re:/\b(?:19|20)\d{2}\b/g},                                            // bare year (over-flag)
-  // street address: number + words + street-type suffix (+ optional unit)
+  {type:"date",   re:new RegExp("\\b(?:"+EN_MONTHS+")\\.?\\s+\\d{1,2}(?:st|nd|rd|th)?,?\\s+\\d{4}\\b","gi")},
+  {type:"date",   re:/\b(?:19|20)\d{2}\s?(?:[-–—]|to)\s?(?:19|20)?\d{2}\b/g},
+  {type:"date",   re:/\b(?:19|20)\d{2}\b/g},
+  {type:"date",   re:/\b(?:0?[1-9]|[12]\d|3[01])\.(?:0?[1-9]|1[0-2])\.(?:(?:19|20)\d{2}|\d{2})\b/g},
+  {type:"date",   re:new RegExp("\\b(?:0?[1-9]|[12]\\d|3[01])\\.\\s*(?:"+DE_MONTHS+")\\s+(?:19|20)\\d{2}\\b","gi")},
+  // addresses EN + DE/CH
   {type:"address",re:/\b\d{1,6}\s+(?:[A-Z][A-Za-z.'\-]+\s+){1,4}(?:Street|St|Avenue|Ave|Road|Rd|Boulevard|Blvd|Lane|Ln|Drive|Dr|Court|Ct|Way|Place|Pl|Terrace|Ter|Circle|Cir|Highway|Hwy|Parkway|Pkwy|Square|Sq|Trail|Trl)\b\.?(?:,?\s*(?:Apt|Suite|Ste|Unit|#)\s*\.?\s*[\w\-]+)?/g},
-  // account / routing: a run of 7–17 digits, possibly grouped with - or spaces
+  {type:"address",re:/\b(?:\p{Lu}[\p{L}'’.\-]+(?:straße|strasse|str\.?|weg|platz|allee|gasse|ring|chaussee|damm|ufer|steig|pfad))\s+\d{1,4}[a-zA-Z]?/giu},
   {type:"account",re:/\b\d(?:[\d\-\s]{5,})\d\b/g,
                   valid:m=>{const d=(m.match(/\d/g)||[]).length; return d>=7&&d<=17;}},
-  // ZIP: 5 digits or ZIP+4
   {type:"zip",    re:/\b\d{5}(?:-\d{4})?\b/g},
+  {type:"zip",    re:/\b(?:CH[-\s]?)?\d{4}\b/g,
+                  valid:m=>{const d=(m.match(/\d/g)||[]).join(""); const n=+d; return d.length===4&&!(n>=1900&&n<=2099)&&n>=1000&&n<=9658;}},
 ];
 
 /* Words that, on their own, should not anchor a "name" detection.
@@ -474,16 +489,42 @@ const NAME_STOP = new Set((
   "Court Supreme District Circuit County State States United Federal Department Office Bank Company "+
   "Corporation Inc Incorporated LLC LLP Co Ltd Plaintiff Defendant Petitioner Respondent Appellant "+
   "Attorney Counsel Law Firm Honorable Judge Justice North South East West New City America American "+
-  "Street Avenue Road Boulevard Drive Lane Mr Mrs Ms Miss Dr Prof"
-).split(/\s+/));
+  "Street Avenue Road Boulevard Drive Lane Mr Mrs Ms Miss Dr Prof "+
+  "Januar Februar März Maerz April Mai Juni Juli August September Oktober November Dezember "+
+  "Montag Dienstag Mittwoch Donnerstag Freitag Samstag Sonntag "+
+  "Der Die Das Den Dem Des Ein Eine Einer Einem Einen Und Oder Aber Für Fuer Von Zu In An Auf Mit Aus Als Ob "+
+  "Mandant Mandantin Zeuge Zeugin Partei Parteien Sache Angelegenheit "+
+  "Gericht Amtsgericht Landgericht Oberlandesgericht Bundesgerichtshof Arbeitsgericht "+
+  "Bundesgericht Steuerrekurskommission Verwaltungsgericht Sozialversicherungsgericht "+
+  "Aktenzeichen Az Verfügung Einsprache Beschwerde Rekurs Berufung Urteil "+
+  "Einspruchsführer Einspruchsführerin Beschwerdeführer Beschwerdeführerin Beschwerdegegner Beschwerdegegnerin "+
+  "Antragsteller Antragstellerin Antragsgegner Antragsgegnerin "+
+  "Kläger Klaeger Klägerin Klaegerin Beklagter Beklagte Beklagten "+
+  "Steuerpflichtige Steuerpflichtiger Steuerpflichtigen "+
+  "Rekurrent Rekurrentin Rekursgegner Rekursgegnerin "+
+  "Rechtsanwalt Rechtsanwältin Anwalt Anwältin Notar Notarin Richter Richterin "+
+  "Herren Herrn Herr Frau Fräulein Fraeulein Dr Prof Straße Strasse Str Weg Platz Allee Gasse Schweiz"
+).split(/\s+/).filter(Boolean));
 
-/* Heuristic name detector: titles, "X v. Y" parties, and 2+ capitalized words. */
+const ROLE_LABELS = [
+  "Einspruchsführerin","Einspruchsführer","Beschwerdeführerin","Beschwerdeführer",
+  "Beschwerdegegnerin","Beschwerdegegner","Antragstellerin","Antragsteller",
+  "Antragsgegnerin","Antragsgegner","Klägerin","Kläger","Klaegerin","Klaeger",
+  "Beklagten","Beklagter","Beklagte","Steuerpflichtigen","Steuerpflichtiger","Steuerpflichtige",
+  "Rekurrentin","Rekurrent","Rekursgegnerin","Rekursgegner"
+].sort((a,b)=>b.length-a.length);
+const ROLE_PREFIX_RE = new RegExp("^(?:"+ROLE_LABELS.map(r=>r.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")).join("|")+")\\s+","iu");
+
+/* ASCII \\b breaks on umlauts — use unicode letter edges. */
+const LB = "(?<![\\p{L}\\p{N}])";
+const RB = "(?![\\p{L}\\p{N}])";
+const W = "\\p{Lu}[\\p{L}'’\\-]*";
+
+/* Heuristic name detector: titles, "X v. Y" / "X gegen Y", unicode names. */
 function detectNames(text){
   const spans = [];
   const push = (start,end)=>{ if(end>start) spans.push({type:"name",start,end,value:text.slice(start,end)}); };
 
-  // Trim leading/trailing boilerplate words ("See", "The", months…) off a
-  // matched capitalized run. Returns adjusted {s,e,n} or null if nothing's left.
   const trimStops = (matchStr, absStart)=>{
     let s = absStart, e = absStart + matchStr.length, toks = matchStr.split(/\s+/);
     while(toks.length && NAME_STOP.has(toks[0].replace(/\.$/,""))){ s += toks[0].length+1; toks.shift(); }
@@ -491,24 +532,20 @@ function detectNames(text){
     return toks.length ? {s, e, n:toks.length} : null;
   };
 
-  // a "name word": Capitalized, optionally with internal hyphens/apostrophes (O'Brien, Nguyen-Lee)
-  const W = "[A-Z][a-z]+(?:[-'][A-Za-z]+)*";
-
-  // 1) Title + name:  Mr. Hale / Dr. Robert Hale  (kept whole — the title is the signal)
-  const titleRe = new RegExp("\\b(?:Mr|Mrs|Ms|Miss|Dr|Prof|Atty|Hon|Judge|Justice|Officer|Det|Sgt|Capt|Lt|Col|Gen|Rev)\\.?\\s+"+W+"(?:\\s+(?:[A-Z]\\.?|"+W+")){0,2}","g");
+  const titleRe = new RegExp(
+    LB+"(?:Mr|Mrs|Ms|Miss|Dr|Prof|Atty|Hon|Judge|Justice|Officer|Det|Sgt|Capt|Lt|Col|Gen|Rev|"+
+    "Herren|Herrn|Herr|Frau|Fräulein|Fraeulein|RA|RAin|StA|Notar(?:in)?|Richter(?:in)?)\\.?\\s+"+
+    W+"(?:\\s+(?:\\p{Lu}\\.?|"+W+")){0,2}"+RB, "gu");
   for(let m; (m=titleRe.exec(text)); ) push(m.index, m.index+m[0].length);
 
-  // 2) Case captions: capture BOTH party names around "v." / "vs.",
-  //    trimming boilerplate so "See Hale v. Fleming" yields "Hale" and "Fleming".
-  const vRe = new RegExp("\\b("+W+"(?:\\s+"+W+"){0,3})\\s+(?:v\\.?|vs\\.?)\\s+("+W+"(?:\\s+"+W+"){0,3})","g");
+  const vRe = new RegExp(
+    LB+"("+W+"(?:\\s+"+W+"){0,3})\\s+(?:v\\.?|vs\\.?|gegen|\\.?\\/\\.?)\\s+("+W+"(?:\\s+"+W+"){0,3})"+RB, "gu");
   for(let m; (m=vRe.exec(text)); ){
     const L = trimStops(m[1], m.index); if(L) push(L.s, L.e);
     const R = trimStops(m[2], m.index + m[0].length - m[2].length); if(R) push(R.s, R.e);
   }
 
-  // 3) General: runs of 2+ capitalized words (allowing middle initials),
-  //    then trim boilerplate and require >=2 real tokens to keep noise down.
-  const genRe = new RegExp("\\b"+W+"(?:\\s+(?:[A-Z]\\.?|"+W+")){1,3}\\b","g");
+  const genRe = new RegExp(LB+W+"(?:\\s+(?:\\p{Lu}\\.?|"+W+")){1,3}"+RB, "gu");
   for(let m; (m=genRe.exec(text)); ){
     const t = trimStops(m[0], m.index);
     if(t && t.n >= 2) push(t.s, t.e);
@@ -524,30 +561,31 @@ const COMMON_CAP = new Set((
   "In On At To From With By Of Off Up Down Over Under Into Onto Per Via Plus Minus Throughout Among Between Against About Around Through Within Without "+
   "This That These Those It Its He She They We You I His Her Their Our My Your Them Us Him Me We "+
   "Then Thus Therefore Also There Here Now Later Next First Second Third Finally Still Even Just Only Both Either Neither Each Every All Most More Less Many Few Some Any No Not Such Other Another Same Several "+
-  "Mr Mrs Ms Miss Dr Prof Re Dear Sincerely Regards Yes Ok Okay Please Thanks Thank Hi Hello Hey Note Per Despite Given"
-).split(/\s+/).map(w=>w.toLowerCase()));
+  "Mr Mrs Ms Miss Dr Prof Re Dear Sincerely Regards Yes Ok Okay Please Thanks Thank Hi Hello Hey Note Per Despite Given "+
+  "Der Die Das Den Dem Des Ein Eine Und Oder Aber Denn Weil Wenn Als Ob "+
+  "Sehr Geehrte Geehrter Hallo Betreff Anlage Bitte Danke Ja Nein Herr Frau Dr Prof "+
+  "Einspruchsführer Beschwerdeführer Beschwerdegegner Antragsteller Antragsgegner Kläger Beklagter Steuerpflichtige Rekurrent Rekursgegner"
+).split(/\s+/).filter(Boolean).map(w=>w.toLowerCase()));
 
-/* FIX 2 — Entity / proper-noun candidates: capitalized words and runs of them.
-   Catches company/product/place names (Samsung, Qualcomm, Snapdragon, South
-   American). Over-flags ON PURPOSE; the human review removes false positives.
-   Skips a capitalized common word only when it begins a sentence. */
+/* Entity / proper-noun candidates (unicode). Over-flags on purpose. */
 function detectEntities(text){
   const spans = [];
-  const re = /[A-Z][A-Za-z0-9&'’\-]*(?:\s+[A-Z][A-Za-z0-9&'’\-]*)*/g;
+  const re = /\p{Lu}[\p{L}\p{N}&'’\-]*(?:\s+\p{Lu}[\p{L}\p{N}&'’\-]*)*/gu;
   for(let m; (m=re.exec(text)); ){
     let start = m.index, end = start + m[0].length;
     let toks = m[0].split(/\s+/);
     const before = text.slice(0, start);
-    const sentInit = /(?:^|[.!?:;]\s*|\n\s*|["'(‘“]\s*)$/.test(before);
-    // strip leading sentence-initial function words ("Despite Samsung" → "Samsung")
+    const sentInit = /(?:^|[.!?:;]\s*|\n\s*|["'(‘“„]\s*)$/.test(before);
     if(sentInit){
-      while(toks.length && COMMON_CAP.has(toks[0].toLowerCase().replace(/[.'’\-]+$/,""))){
+      while(toks.length && COMMON_CAP.has(toks[0].toLowerCase().replace(/[.'’\-]+$/u,""))){
         start += toks[0].length + 1; toks.shift();
       }
     }
+    while(toks.length && NAME_STOP.has(toks[0].replace(/\.$/,""))){ start += toks[0].length+1; toks.shift(); }
+    while(toks.length && NAME_STOP.has(toks[toks.length-1].replace(/\.$/,""))){ end -= toks[toks.length-1].length+1; toks.pop(); }
     if(!toks.length) continue;
-    // skip a lone 1-letter token ("I", "A")
-    if(toks.length===1 && toks[0].replace(/[^A-Za-z0-9]/g,"").length < 2) continue;
+    if(toks.length===1 && toks[0].replace(/[^\p{L}\p{N}]/gu,"").length < 2) continue;
+    if(toks.length===1 && NAME_STOP.has(toks[0].replace(/\.$/,""))) continue;
     spans.push({type:"entity", start, end, value:text.slice(start,end)});
   }
   return spans;
@@ -564,8 +602,8 @@ function detectTerms(text, terms){
     if(!t) continue;
     const esc = t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     let re;
-    try { re = new RegExp("(?<![A-Za-z0-9])"+esc+"(?![A-Za-z0-9])", "gi"); }   // whole-word-ish
-    catch(e){ re = new RegExp(esc, "gi"); }                                     // fallback (older engines)
+    try { re = new RegExp("(?<![\\p{L}\\p{N}])"+esc+"(?![\\p{L}\\p{N}])", "giu"); }
+    catch(e){ re = new RegExp(esc, "gi"); }
     for(let m; (m=re.exec(text)); ){
       if(m[0].length===0){ re.lastIndex++; continue; }
       spans.push({type:"term", start:m.index, end:m.index+m[0].length, value:m[0],
@@ -575,32 +613,38 @@ function detectTerms(text, terms){
   return spans;
 }
 
-/* Name-part linking: once a fuller name or entity is detected (e.g. "Catherine
-   Mills", "Smith LLC"), also catch BARE later occurrences of its significant
-   parts ("Catherine", "Mills", "Smith") so single-word references don't slip. */
 function linkNameParts(text, spans){
-  const SUFFIX = /^(LLC|Inc|Incorporated|Corp|Corporation|LLP|PLLC|PC|LP|Co|Company|Ltd|Trust|Partners|Group|Associates|Holdings|Ventures|Capital|Foundation|Bancorp|Bank|Insurance)\.?$/i;
+  const SUFFIX = /^(LLC|Inc|Incorporated|Corp|Corporation|LLP|PLLC|PC|LP|Co|Company|Ltd|Trust|Partners|Group|Associates|Holdings|Ventures|Capital|Foundation|Bancorp|Bank|Insurance|GmbH|AG|UG|OHG|KG|GbR|SE|mbH)\.?$/iu;
   const tokenType = new Map();
   for(const s of spans){
     if(s.type!=="name" && s.type!=="entity") continue;
     for(const raw of s.value.split(/\s+/)){
-      const t = raw.replace(/^[^A-Za-z0-9]+|[^A-Za-z0-9]+$/g,"");
-      if(t.length>=3 && /^[A-Z]/.test(t) && !NAME_STOP.has(t.replace(/\.$/,"")) && !SUFFIX.test(t)){
+      const t = raw.replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu,"");
+      if(t.length>=3 && /^\p{Lu}/u.test(t) && !NAME_STOP.has(t.replace(/\.$/,"")) && !SUFFIX.test(t)){
         if(!tokenType.has(t) || s.type==="name") tokenType.set(t, s.type);
       }
     }
   }
   const out = [];
   for(const [t,type] of tokenType){
-    const re = new RegExp("\\b"+t.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")+"\\b","g");
+    const re = new RegExp(LB+t.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")+RB,"gu");
     for(let m; (m=re.exec(text)); ){
       const st=m.index, en=st+m[0].length;
-      if(spans.some(sp=>st<sp.end && en>sp.start)) continue;   // already covered by a fuller match
+      if(spans.some(sp=>st<sp.end && en>sp.start)) continue;
       if(out.some(sp=>st<sp.end && en>sp.start)) continue;
       out.push({type, start:st, end:en, value:m[0]});
     }
   }
   return out;
+}
+
+function stripLeadingRole(span, text){
+  const v = text.slice(span.start, span.end);
+  const m = ROLE_PREFIX_RE.exec(v);
+  if(!m) return span;
+  const start = span.start + m[0].length;
+  if(start >= span.end) return null;
+  return {...span, start, value:text.slice(start, span.end)};
 }
 
 /* Run all enabled detectors + custom terms, then resolve overlaps. */
@@ -617,9 +661,12 @@ function detect(text, enabled, terms){
   }
   if(enabled.entity) spans = spans.concat(detectEntities(text));
   if(enabled.name)   spans = spans.concat(detectNames(text));
-  // catch bare single-word references to any detected person/entity name
+  spans = spans.map(s=>{
+    if(s.type!=="name" && s.type!=="entity") return s;
+    if(ROLE_LABELS.some(r=>r.toLowerCase()===s.value.trim().toLowerCase())) return null;
+    return stripLeadingRole(s, text);
+  }).filter(Boolean);
   if(enabled.name || enabled.entity) spans = spans.concat(linkNameParts(text, spans));
-  // custom terms are ALWAYS applied (the user's own list) and win over everything
   if(terms && terms.length) spans = spans.concat(detectTerms(text, terms));
   return resolveOverlaps(spans);
 }
@@ -922,9 +969,10 @@ function clearAll(){
 }
 
 const EXAMPLE =
-"Robert Hale wired $80,000 to his brother Daniel Hale on March 3, 2025, from account 4471-2231.\n"+
-"His SSN is 412-55-9087 and he can be reached at rhale@example.com or (415) 555-0132.\n"+
-"He lives at 220 Pine Street, San Francisco, CA 94104. See Hale v. Fleming, Case No. 3:25-cv-01199.";
+"Der Beschwerdeführer Klaus-Peter Müller, Steuerpflichtiger, wohnhaft Bahnhofstrasse 5, 8001 Zürich,\n"+
+"erhebt Beschwerde gegen die Verfügung vom 14.07.2023 (Aktenzeichen 2C_123/2024). Forderung: CHF 12'500.00.\n"+
+"Erreichbar unter +41 79 123 45 67 und klaus.mueller@beispiel.ch. IBAN CH93 0076 2011 6238 5295 7.\n"+
+"English caption: Hale v. Fleming, Case No. 3:25-cv-01199 — dates like 1.3.2024 stay in cleartext.";
 
 /* ===========================================================================
    OPTIONAL EMAIL CAPTURE  — the ONLY network code in this file.
@@ -1002,17 +1050,17 @@ async function submitKit(ev){
    WIRE-UP
    --------------------------------------------------------------------------- */
 function buildTypeOptions(){
-  // detection toggles — ALL on by default (over-flag), the user unchecks what they don't want
+  // Most toggles on by default (over-flag). Dates OFF — leave calendar forms clear.
   const optBox = $("typeOpts");
   TOGGLEABLE.forEach(t=>{
     const lab=document.createElement("label");
-    lab.innerHTML='<input type="checkbox" data-opt="'+t+'" id="opt_'+t+'" checked> '+TYPES[t].label;
+    const on = !DEFAULT_OFF.has(t);
+    lab.innerHTML='<input type="checkbox" data-opt="'+t+'" id="opt_'+t+'" '+(on?"checked":"")+'> '+TYPES[t].label;
     optBox.appendChild(lab);
   });
 
-  // manual add type dropdown ("redact this too")
   const sel=$("addType");
-  ["term","name","entity","ssn","email","phone","address","zip","date","account","case","money","other"].forEach(t=>{
+  ["term","name","entity","ssn","iban","email","phone","address","zip","date","account","case","money","other"].forEach(t=>{
     const o=document.createElement("option"); o.value=t; o.textContent=TYPES[t].label; sel.appendChild(o);
   });
   sel.value="other";

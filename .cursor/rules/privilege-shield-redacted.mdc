@@ -1,0 +1,27 @@
+---
+description: Privilege Shield — work only on pseudonymized documents; never touch keys or cleartext.
+globs:
+  - redacted/**
+  - "**/*.redacted.*"
+  - ps-session-meta.json
+alwaysApply: true
+---
+
+# Privilege Shield / Cursor Agent rules
+
+You are working in a **pseudonymized** corpus prepared by Privilege Shield CLI.
+
+## Hard rules
+
+1. **Never open, read, request, print, or commit** files under `secrets/`, `inbox/`, `cleartext/`, `restored/`, or any `*ps-key*.json` / vault key.
+2. **Never ask the user** for real names, IBANs, emails, or the contents of the key file.
+3. Treat placeholders / pseudonyms (`[CLIENT_1]`, `Alex Berner`, …) as **opaque stable tokens**. Do not invent or guess who they refer to.
+4. Work only on `redacted/` (or paths the user marks as already redacted). Prefer `ps-session-meta.json` for token inventory — it has **no** real values.
+5. If you see what looks like a real identifier that was not replaced, **stop and flag it** — do not process further until the user re-runs local anonymization.
+6. Restoration of real values happens **only locally** with the CLI + key. Do not attempt restore in this environment.
+
+## Allowed
+
+- Analyze / rewrite / summarize redacted documents.
+- Keep every token spelling exactly as given in outputs.
+- Commit only under `redacted/` (and agent-safe meta such as `ps-session-meta.json`).
