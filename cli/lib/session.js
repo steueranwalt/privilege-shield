@@ -1,17 +1,16 @@
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
 import { dirname } from "node:path";
 
-const KEY_VERSION = 1;
+const KEY_VERSION = 2;
 
 export function createEmptySession() {
   return {
     version: KEY_VERSION,
     created: new Date().toISOString(),
     updated: new Date().toISOString(),
-    map: {}, // placeholder → real value
-    // internal consistency helpers (safe to persist; no extra PII beyond map)
+    map: {}, // pseudonym → real value
     counters: {},
-    byKey: {}, // detection key → placeholder
+    byKey: {}, // detection key → pseudonym
   };
 }
 
@@ -44,12 +43,12 @@ export function saveSession(path, session) {
     byKey: session.byKey || {},
     warning:
       "LOCAL SECRET — never commit, upload, or paste this file into an AI tool. " +
-      "It maps placeholders back to real identifiers.",
+      "It maps pseudonyms back to real identifiers.",
   };
   writeFileSync(path, JSON.stringify(out, null, 2) + "\n", "utf8");
 }
 
-/** Invert placeholder→value into value→placeholder for reporting. */
+/** Invert pseudonym→value into value→pseudonym for reporting. */
 export function invertMap(map) {
   const inv = {};
   for (const [ph, val] of Object.entries(map)) inv[val] = ph;

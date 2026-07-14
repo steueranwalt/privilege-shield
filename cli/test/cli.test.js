@@ -26,44 +26,45 @@ describe("CLI batch anonymize / deanonymize", () => {
     rmSync(dir, { recursive: true, force: true });
   });
 
-  it("anonymizes a folder and restores with the key", () => {
+  it("anonymizes with pseudonyms, keeps dates, restores via key", () => {
     const out = join(dir, "redacted");
     const key = join(dir, "secrets", "key.json");
     const back = join(dir, "restored");
 
     const a = run(
-      ["anonymize", fixtures, "--out", out, "--key", key, "--json"],
+      ["anonymize", fixtures, "--out", out, "--key", key, "--auto", "--json"],
       dir
     );
-    assert.equal(a.status, 0, a.stderr);
+    assert.equal(a.status, 0, a.stderr + a.stdout);
     const summary = JSON.parse(a.stdout);
-    assert.ok(summary.files >= 2);
-    assert.ok(summary.uniquePlaceholders > 0);
+    assert.ok(summary.files >= 3);
+    assert.ok(summary.uniquePseudonyms > 0);
+    assert.equal(summary.datesLeftIntact, true);
     assert.ok(existsSync(key));
 
-    const deOut = readFileSync(join(out, "de-sample.redacted.txt"), "utf8");
-    assert.ok(!deOut.includes("anna.schaefer@beispiel.de"));
-    assert.ok(deOut.includes("[EMAIL_"));
+    const chOut = readFileSync(join(out, "ch-sample.redacted.txt"), "utf8");
+    assert.ok(!chOut.includes("klaus.mueller@beispiel.ch"));
+    assert.ok(chOut.includes("1.3.2024"));
+    assert.ok(chOut.includes("14.07.2023"));
+    assert.ok(chOut.includes("Beschwerdeführer"));
+    assert.ok(!/\[EMAIL_\d+\]/.test(chOut));
 
     const d = run(
       ["deanonymize", out, "--out", back, "--key", key, "--json"],
       dir
     );
     assert.equal(d.status, 0, d.stderr);
-    const restoredDe = readFileSync(join(back, "de-sample.txt"), "utf8");
-    const originalDe = readFileSync(join(fixtures, "de-sample.txt"), "utf8");
-    assert.equal(restoredDe, originalDe);
+    const restoredCh = readFileSync(join(back, "ch-sample.txt"), "utf8");
+    const originalCh = readFileSync(join(fixtures, "ch-sample.txt"), "utf8");
+    assert.equal(restoredCh, originalCh);
   });
 
-  it("scan --json reports German detections", () => {
-    const r = run(["scan", join(fixtures, "de-sample.txt"), "--json"], dir);
+  it("scan --json reports Swiss detections without dates", () => {
+    const r = run(["scan", join(fixtures, "ch-sample.txt"), "--json", "--auto"], dir);
     assert.equal(r.status, 0, r.stderr);
     const summary = JSON.parse(r.stdout);
     assert.equal(summary.files, 1);
-    assert.ok(summary.uniquePlaceholders > 5);
-    const types = new Set(
-      summary.results[0].sample.map((s) => s.type)
-    );
-    assert.ok(types.has("iban") || types.has("email"));
+    assert.equal(summary.datesLeftIntact, true);
+    assert.ok(summary.uniquePseudonyms > 3);
   });
 });

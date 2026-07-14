@@ -63,11 +63,13 @@ which is what makes restore reliable.
 **Not supported in v1:** PDFs (hidden text-layer and metadata failure modes — out of
 scope on purpose). Text only.
 
-## Batch CLI (English + German)
+## Batch CLI (Deutsch / Schweiz + English)
 
-For large folders, use the local CLI under [`cli/`](cli/) — same offline model,
-shared placeholders across files, **English and German** detectors (IBAN, Aktenzeichen,
-Straße, `gegen`, umlaut names, € amounts, etc.).
+For large folders, use the local CLI under [`cli/`](cli/) — offline, shared
+**pseudonyms** across files (with an interactive prompt), DE/CH detectors
+(IBAN, Aktenzeichen, Straße, `gegen`, umlauts, €/**CHF**, `+41`, Swiss dates
+`TT.MM.JJJJ` / `T.M.JJJJ`). **Dates are left unchanged.** Verfahrensrollen
+(Beschwerdeführer, Rekurrent, Steuerpflichtige(r), …) stay as labels.
 
 ```bash
 cd cli
@@ -81,8 +83,8 @@ node bin/privilege-shield.js deanonymize ../redacted/ \
   --key ../secrets/ps-key.json
 ```
 
-See [`cli/README.md`](cli/README.md) for the full Cursor workflow. The key file is a
-secret: keep it outside any repo a cloud agent can access.
+See [`cli/README.md`](cli/README.md). The key maps pseudonym → real value — keep it
+outside any repo a cloud agent can access.
 
 ---
 

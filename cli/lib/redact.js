@@ -1,9 +1,9 @@
-import { TYPES, DEFAULT_ENABLED } from "./types.js";
+import { DEFAULT_ENABLED, TYPES } from "./types.js";
 import { detect } from "./detectors.js";
+import { suggestPseudonym, uniquifyPseudo } from "./pseudos.js";
 
 /**
- * Group spans by (type + value) so identical values share one placeholder.
- * Session counters can be passed so batch runs keep stable IDs across files.
+ * Group spans by (type + value) so identical values share one pseudonym.
  */
 export function regroup(spans, prevItems = null, itemSeqRef = { n: 0 }) {
   const prevEnabled = {};
@@ -18,7 +18,7 @@ export function regroup(spans, prevItems = null, itemSeqRef = { n: 0 }) {
         value: (s.display || s.value).trim(),
         key,
         enabled: key in prevEnabled ? prevEnabled[key] : true,
-        placeholder: null,
+        placeholder: null, // holds the pseudonym string
         occ: [],
       });
     }
@@ -33,29 +33,69 @@ export function regroup(spans, prevItems = null, itemSeqRef = { n: 0 }) {
 }
 
 /**
- * Assign placeholders using a shared counter map so batch sessions stay consistent.
- * @param {object[]} items
- * @param {Record<string, number>} counters  mutated
- * @param {Record<string, string>} existingByKey  key → placeholder already assigned
+ * Assign pseudonyms (not [TYPE_N] placeholders).
+ * existingByKey: detection key → already chosen pseudonym
+ * sessionMap: pseudonym → real value
+ * overrides: optional key → pseudonym|null (null = skip / keep cleartext)
  */
-export function assignPlaceholders(items, counters = {}, existingByKey = {}) {
+export function assignPseudonyms(
+  items,
+  {
+    counters = {},
+    existingByKey = {},
+    sessionMap = {},
+    overrides = null,
+    style = "pseudo", // "pseudo" | "placeholders"
+  } = {}
+) {
   for (const it of items) {
     if (!it.enabled) {
       it.placeholder = null;
       continue;
     }
-    if (existingByKey[it.key]) {
-      it.placeholder = existingByKey[it.key];
+
+    if (overrides && Object.prototype.hasOwnProperty.call(overrides, it.key)) {
+      const chosen = overrides[it.key];
+      if (chosen == null) {
+        it.enabled = false;
+        it.placeholder = null;
+        continue;
+      }
+      const unique = uniquifyPseudo(chosen, sessionMap);
+      it.placeholder = unique;
+      existingByKey[it.key] = unique;
+      sessionMap[unique] = it.value;
       continue;
     }
-    counters[it.type] = (counters[it.type] || 0) + 1;
-    it.placeholder = "[" + TYPES[it.type].prefix + "_" + counters[it.type] + "]";
-    existingByKey[it.key] = it.placeholder;
+
+    if (existingByKey[it.key]) {
+      it.placeholder = existingByKey[it.key];
+      sessionMap[it.placeholder] = it.value;
+      continue;
+    }
+
+    let pseudo;
+    if (style === "placeholders") {
+      counters[it.type] = (counters[it.type] || 0) + 1;
+      pseudo = "[" + TYPES[it.type].prefix + "_" + counters[it.type] + "]";
+    } else {
+      // Dates must never be altered (safety net even if date detection is on)
+      if (it.type === "date") {
+        it.enabled = false;
+        it.placeholder = null;
+        continue;
+      }
+      pseudo = uniquifyPseudo(suggestPseudonym(it.type, it.value, counters), sessionMap);
+    }
+
+    it.placeholder = pseudo;
+    existingByKey[it.key] = pseudo;
+    sessionMap[pseudo] = it.value;
   }
-  return { counters, existingByKey };
+  return { counters, existingByKey, sessionMap };
 }
 
-/** Apply placeholders left-to-right; return { text, map }. */
+/** Apply pseudonyms left-to-right; return { text, map }. */
 export function redactText(text, items) {
   const enabledItems = items.filter((i) => i.enabled && i.placeholder);
   const occ = [];
@@ -78,7 +118,7 @@ export function redactText(text, items) {
   return { text: out, map };
 }
 
-/** Restore placeholders using a map (longest-first). */
+/** Restore pseudonyms using map (pseudo → real), longest-first. */
 export function restoreText(text, map) {
   let out = text;
   const phs = Object.keys(map).sort((a, b) => b.length - a.length);
@@ -87,27 +127,38 @@ export function restoreText(text, map) {
   return { text: out, leftover };
 }
 
+/** Detect + regroup only (no assignment yet) — for prior interactive query. */
+export function collectItems(text, options = {}) {
+  const enabled = { ...DEFAULT_ENABLED, ...(options.enabled || {}) };
+  // Hard rule: dates stay unless explicitly enabled
+  if (options.enabled?.date !== true) enabled.date = false;
+  const terms = options.terms || [];
+  const itemSeqRef = options.itemSeqRef || { n: 0 };
+  const spans = detect(text, enabled, terms);
+  const items = regroup(spans, null, itemSeqRef);
+  return { items, enabled, itemSeqRef };
+}
+
 /**
  * Full pass on one document string.
- * @param {string} text
- * @param {object} options
- * @param {Record<string, boolean>} [options.enabled]
- * @param {string[]} [options.terms]
- * @param {Record<string, number>} [options.counters]
- * @param {Record<string, string>} [options.existingByKey]
- * @param {Record<string, string>} [options.sessionMap] placeholder → value
+ * options.overrides: key → pseudonym|null for novel items
+ * options.style: "pseudo" (default) | "placeholders"
  */
 export function anonymizeString(text, options = {}) {
-  const enabled = { ...DEFAULT_ENABLED, ...(options.enabled || {}) };
-  const terms = options.terms || [];
+  const { items, itemSeqRef } = collectItems(text, options);
   const counters = options.counters || {};
   const existingByKey = options.existingByKey || {};
   const sessionMap = options.sessionMap || {};
-  const itemSeqRef = options.itemSeqRef || { n: 0 };
+  const style = options.style || "pseudo";
 
-  const spans = detect(text, enabled, terms);
-  const items = regroup(spans, null, itemSeqRef);
-  assignPlaceholders(items, counters, existingByKey);
+  assignPseudonyms(items, {
+    counters,
+    existingByKey,
+    sessionMap,
+    overrides: options.overrides || null,
+    style,
+  });
+
   const { text: redacted, map } = redactText(text, items);
   Object.assign(sessionMap, map);
 
@@ -121,6 +172,38 @@ export function anonymizeString(text, options = {}) {
     sessionMap,
     itemSeqRef,
   };
+}
+
+/**
+ * Build pending list of novel entities across many files for interactive prompt.
+ */
+export function collectPendingAcrossFiles(fileTexts, options = {}) {
+  const counters = options.counters || {};
+  const existingByKey = options.existingByKey || {};
+  const sessionMap = options.sessionMap || {};
+  const itemSeqRef = options.itemSeqRef || { n: 0 };
+  const pending = [];
+  const seen = new Set(Object.keys(existingByKey));
+
+  for (const { file, text } of fileTexts) {
+    const { items } = collectItems(text, { ...options, itemSeqRef });
+    for (const it of items) {
+      if (!it.enabled) continue;
+      if (it.type === "date") continue;
+      if (seen.has(it.key) || existingByKey[it.key]) continue;
+      seen.add(it.key);
+      const suggestion = suggestPseudonym(it.type, it.value, counters);
+      pending.push({
+        key: it.key,
+        type: it.type,
+        value: it.value,
+        suggestion,
+        file,
+      });
+    }
+  }
+
+  return { pending, counters, itemSeqRef };
 }
 
 function summarize(items) {

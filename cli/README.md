@@ -1,73 +1,63 @@
 # Privilege Shield CLI
 
-Local **batch** pseudonymization (English + German). Same trust idea as the browser tool: documents and the placeholder key never leave your machine.
+Lokale **Stapel-Pseudonymisierung** (Deutsch / Deutsch-Schweiz / English).  
+Gleiche Trust-Idee wie das Browser-Tool: Dokumente und Key verlassen Ihren Rechner nicht.
 
-## Install / run
+## Verhalten
 
-Requires Node 18+.
+| Thema | Default |
+|--------|---------|
+| Ersetzung | **Pseudonyme** (z. B. `Alex Berner`), nicht `[CLIENT_1]` |
+| Abfrage | Interaktiv vor dem Schreiben (Enter = Vorschlag, `-` = behalten) |
+| Daten | **bleiben unverändert** (TT.MM.JJJJ, T.M.JJJJ, 14. Juli 1982, …) |
+| Währung | `$`, `€`/`EUR`, **`CHF`/`Fr.`** |
+| Telefon | US, `+49`, **`+41`** |
+| Rollen | Labels bleiben: Einspruchsführer, Beschwerdeführer/‑gegner, Antragsteller/‑gegner, Kläger/Beklagte, Steuerpflichtige(r), Rekurrent/Rekursgegner |
+
+## Install / starten
+
+Node 18+.
 
 ```bash
 cd cli
 node bin/privilege-shield.js --help
-
-# or, from this directory:
-npm link          # optional — puts `privilege-shield` on your PATH
 ```
 
-## Typical Cursor workflow
+## Cursor-Workflow
 
-1. Keep **cleartext** client files and the key **outside** any git repo a Cloud Agent can clone.
-2. Batch-redact locally into a folder you *do* commit (or sync) for the agent.
-3. Let the Cursor agent work only on redacted text.
-4. Restore locally with the key when you need real names again.
+1. Klartext + Key **außerhalb** jedes Repos halten, das ein Cloud-Agent klonen kann.  
+2. Lokal batch-pseudonymisieren.  
+3. Agent nur auf dem redigierten Ordner arbeiten lassen.  
+4. Lokal mit dem Key wiederherstellen.
 
 ```bash
-# 1) Pseudonymize a whole inbox (shared placeholders across files)
 mkdir -p ../secrets ../redacted
+
+# Mit Abfrage der Pseudonyme (TTY)
+node bin/privilege-shield.js anonymize ../inbox/ \
+  --out ../redacted/ \
+  --key ../secrets/ps-key.json
+
+# Ohne Abfrage (CI / Skripte)
 node bin/privilege-shield.js anonymize ../inbox/ \
   --out ../redacted/ \
   --key ../secrets/ps-key.json \
-  --terms-file ../terms.txt
+  --auto
 
-# 2) Work in Cursor on ../redacted/ only
-
-# 3) Restore when done
 node bin/privilege-shield.js deanonymize ../redacted/ \
   --out ../restored/ \
   --key ../secrets/ps-key.json
 ```
 
-Add secrets/keys to `.gitignore` (this repo already ignores `secrets/`, `*.ps-key.json`, and common cleartext inbox folders).
+## Befehle
 
-## Commands
+| Befehl | Zweck |
+|--------|--------|
+| `anonymize` | Erkennen, Pseudonyme setzen, `*.redacted.*` schreiben, Key aktualisieren |
+| `deanonymize` | Pseudonyme anhand des Keys zurücksetzen |
+| `scan` | Vorschau ohne Schreiben |
 
-| Command | Purpose |
-|--------|---------|
-| `anonymize` | Detect PII, write `*.redacted.*` files, update key |
-| `deanonymize` | Replace placeholders using the key |
-| `scan` | Preview detections without writing |
-
-### Options
-
-- `--out / -o` — output directory  
-- `--key / -k` — session key JSON (secret)  
-- `--terms` / `--terms-file` — always-redact phrases  
-- `--disable name,entity,…` — turn categories off  
-- `--dry-run`, `--json`
-
-## German + English coverage (v1 CLI)
-
-| Category | EN | DE |
-|----------|----|----|
-| Names / parties | `v.` / `vs.` captions, titles | `gegen`, Herr/Frau/RA/…, Unicode (Müller) |
-| Addresses | Street/Ave/… | Straße/Str./Weg/Platz/… |
-| IDs | SSN | Steuer-ID patterns, **IBAN** |
-| Phones | US | `+49` / `0…` |
-| Dates | Jan 15, 2026 | 14.07.2026, 14. Juli 1982 |
-| Money | `$` | `€` / EUR / Euro |
-| Cases | docket / Case No. | Aktenzeichen / `12 C 345/24` |
-
-Detectors still **over-flag**; spot-check before relying on output. PDFs are out of scope (text extracts only: `.txt`, `.md`, `.csv`, …).
+Wichtige Optionen: `--auto` / `-y`, `--interactive` / `-i`, `--enable-dates` (nicht empfohlen), `--placeholders` (altes `[TYPE_n]`), `--terms`, `--disable`.
 
 ## Tests
 

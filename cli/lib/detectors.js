@@ -29,8 +29,17 @@ const NAME_STOP = new Set((
   "Sehr Geehrte Geehrter Mit freundlichen Grüßen Grueßen Grüßen Gruss Hallo Betreff Anlage Anlagen Anlage " +
   "Mandant Mandantin Zeuge Zeugin Partei Parteien Sache Angelegenheit " +
   "Gericht Amtsgericht Landgericht Oberlandesgericht Bundesgerichtshof Arbeitsgericht " +
-  "Bundesland Land Kreis Stadt Gemeinde Bundesrepublik Deutschland " +
-  "Kläger Klaeger Klägerin Klaegerin Beklagter Beklagte Antragsteller Antragstellerin Antragsgegner Antragsgegnerin " +
+  "Bundesgericht Steuerrekurskommission Verwaltungsgericht Sozialversicherungsgericht " +
+  "Bundesland Land Kreis Stadt Gemeinde Bundesrepublik Deutschland Schweiz " +
+  "Aktenzeichen Az Verfügung Einsprache Beschwerde Rekurs Berufung Urteil " +
+  // Verfahrensrollen DE/CH — Labels bleiben stehen; nur die Personennamen werden pseudonymisiert
+  "Einspruchsführer Einspruchsführerin EinspruchsFuehrer EinspruchsFuehrerin " +
+  "Beschwerdeführer Beschwerdeführerin Beschwerdefuehrer Beschwerdefuehrerin " +
+  "Beschwerdegegner Beschwerdegegnerin " +
+  "Antragsteller Antragstellerin Antragsgegner Antragsgegnerin " +
+  "Kläger Klaeger Klägerin Klaegerin Beklagter Beklagte Beklagten " +
+  "Steuerpflichtige Steuerpflichtiger Steuerpflichtigen " +
+  "Rekurrent Rekurrentin Rekursgegner Rekursgegnerin " +
   "Berufungskläger Berufungsklaeger Berufungsbeklagter " +
   "Rechtsanwalt Rechtsanwältin Rechtsanwaeltin Anwalt Anwältin Anwaeltin Notar Notarin " +
   "Richter Richterin Staatsanwalt Staatsanwältin Herr Frau Fräulein Fraeulein Dr Prof " +
@@ -50,7 +59,10 @@ const COMMON_CAP = new Set((
   "Er Sie Es Wir Ihr Sie Sein Seine Sein Sein Ihr Ihre Ihre " +
   "Dann Also Daher Deshalb Außerdem Ausserdem Jedoch Trotzdem Noch Nur Schon Auch Auch Auch " +
   "Sehr Geehrte Geehrter Hallo Betreff Anlage Bitte Danke Ja Nein Herr Frau Dr Prof " +
-  "Hier Dort Nun Später Spaeter Zuerst Zweitens Drittens Schließlich Schliesslich"
+  "Hier Dort Nun Später Spaeter Zuerst Zweitens Drittens Schließlich Schliesslich " +
+  "Einspruchsführer Einspruchsführerin Beschwerdeführer Beschwerdeführerin Beschwerdegegner Beschwerdegegnerin " +
+  "Antragsteller Antragstellerin Antragsgegner Antragsgegnerin Kläger Klägerin Beklagter Beklagte " +
+  "Steuerpflichtige Steuerpflichtiger Rekurrent Rekurrentin Rekursgegner Rekursgegnerin"
 ).split(/\s+/).filter(Boolean).map((w) => w.toLowerCase()));
 
 const DE_MONTHS =
@@ -61,6 +73,34 @@ const EN_MONTHS =
 
 /* Unicode “name word”: Müller, O'Brien, Jean-Luc, Schäfer */
 const W = "\\p{Lu}[\\p{L}'’\\-]*";
+
+/** Verfahrensrollen — stay in cleartext; strip from the start of name/entity spans. */
+const ROLE_LABELS = [
+  "Einspruchsführerin", "Einspruchsführer",
+  "Beschwerdeführerin", "Beschwerdeführer",
+  "Beschwerdegegnerin", "Beschwerdegegner",
+  "Antragstellerin", "Antragsteller",
+  "Antragsgegnerin", "Antragsgegner",
+  "Klägerin", "Kläger", "Klaegerin", "Klaeger",
+  "Beklagten", "Beklagter", "Beklagte",
+  "Steuerpflichtigen", "Steuerpflichtiger", "Steuerpflichtige",
+  "Rekurrentin", "Rekurrent",
+  "Rekursgegnerin", "Rekursgegner",
+].sort((a, b) => b.length - a.length);
+
+const ROLE_PREFIX_RE = new RegExp(
+  `^(?:${ROLE_LABELS.map((r) => r.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|")})\\s+`,
+  "iu"
+);
+
+function stripLeadingRole(span, text) {
+  const v = text.slice(span.start, span.end);
+  const m = ROLE_PREFIX_RE.exec(v);
+  if (!m) return span;
+  const start = span.start + m[0].length;
+  if (start >= span.end) return null;
+  return { ...span, start, value: text.slice(start, span.end) };
+}
 
 /* ---------------------------------------------------------------------------
    REGEX DETECTORS
@@ -100,7 +140,7 @@ export const REGEX_DETECTORS = [
   },
   {
     type: "phone",
-    re: /(?:\+49[\s.\-\/]?|0)(?:\(?\d{2,5}\)?[\s.\-\/]?)?\d{3,8}(?:[\s.\-\/]?\d{2,8}){0,3}\b/g,
+    re: /(?:\+(?:49|41)[\s.\-\/]?|0)(?:\(?\d{2,5}\)?[\s.\-\/]?)?\d{3,8}(?:[\s.\-\/]?\d{2,8}){0,3}\b/g,
     valid: (m) => {
       const d = (m.match(/\d/g) || []).length;
       return d >= 7 && d <= 15;
@@ -125,7 +165,7 @@ export const REGEX_DETECTORS = [
     type: "case",
     re: /\b\d\s?[A-Za-z]{1,3}[A-Za-z]\s?\d{1,5}\/\d{2,4}\b/g,
   },
-  // Money: $ / € / Euro / EUR
+  // Money: $ / € / Euro / EUR / CHF / Fr.
   {
     type: "money",
     re: /\$\s?\d[\d,]*(?:\.\d+)?(?:\s?(?:hundred|thousand|million|billion|trillion|bn|mn|[kmbt]))?\b/gi,
@@ -142,7 +182,11 @@ export const REGEX_DETECTORS = [
     type: "money",
     re: /\b\d{1,3}(?:\.\d{3})*,\d{2}\s?(?:€|EUR|Euro)?\b/g,
   },
-  // Dates EN
+  {
+    type: "money",
+    re: /(?:CHF|Fr\.?)\s?'?\s?\d{1,3}(?:[’'`.\s]\d{3})*(?:[.,]\d{2})?|\d{1,3}(?:[’'`.\s]\d{3})*(?:[.,]\d{2})?\s?(?:CHF|Fr\.?)\b/gi,
+  },
+  // Dates EN (off by default — kept in cleartext)
   {
     type: "date",
     re: /\b(?:0?[1-9]|1[0-2])[\/\-](?:0?[1-9]|[12]\d|3[01])[\/\-](?:\d{4}|\d{2})\b/g,
@@ -161,10 +205,15 @@ export const REGEX_DETECTORS = [
   },
   { type: "date", re: /\b(?:19|20)\d{2}\s?(?:[-–—]|to)\s?(?:19|20)?\d{2}\b/g },
   { type: "date", re: /\b(?:19|20)\d{2}\b/g },
-  // Dates DE: 14.07.2026 · 14. Juli 2026 · Juli 2026
+  // Dates DE/CH: 14.07.2026 · 14.7.2026 · 1.3.2024 · 1.3.24 · 14. Juli 1982
+  // TT.MM.JJJJ and T.M.JJJJ (Deutsch Schweiz)
   {
     type: "date",
-    re: /\b(?:0?[1-9]|[12]\d|3[01])\.(?:0?[1-9]|1[0-2])\.(?:19|20)\d{2}\b/g,
+    re: /\b(?:0?[1-9]|[12]\d|3[01])\.(?:0?[1-9]|1[0-2])\.(?:(?:19|20)\d{2}|\d{2})\b/g,
+  },
+  {
+    type: "date",
+    re: /\b(?:0?[1-9]|[12]\d|3[01])\.\s*(?:0?[1-9]|1[0-2])\.\s*(?:(?:19|20)\d{2}|\d{2})\b/g,
   },
   {
     type: "date",
@@ -200,8 +249,19 @@ export const REGEX_DETECTORS = [
       return d >= 7 && d <= 17;
     },
   },
-  // ZIP US + PLZ DE (5 digits)
+  // ZIP US (5 or ZIP+4) + PLZ DE (5) + PLZ CH (4)
   { type: "zip", re: /\b\d{5}(?:-\d{4})?\b/g },
+  {
+    type: "zip",
+    re: /\b(?:CH[-\s]?)?\d{4}\b/g,
+    valid: (m) => {
+      const d = (m.match(/\d/g) || []).join("");
+      const n = Number(d);
+      // Exclude year-like values so dates stay untouched / un-misclassified
+      if (d.length !== 4 || (n >= 1900 && n <= 2099)) return false;
+      return n >= 1000 && n <= 9658; // Swiss PLZ range (approx.)
+    },
+  },
 ];
 
 /* ---------------------------------------------------------------------------
@@ -223,6 +283,10 @@ function trimStops(matchStr, absStart) {
   return toks.length ? { s, e, n: toks.length } : null;
 }
 
+/** ASCII `\b` breaks on umlauts (ü counts as non-word). Use unicode letter edges. */
+const LB = "(?<![\\p{L}\\p{N}])"; // left boundary
+const RB = "(?![\\p{L}\\p{N}])"; // right boundary
+
 /** Titles + "X v. Y" / "X gegen Y" + capitalized runs (Unicode). */
 export function detectNames(text) {
   const spans = [];
@@ -231,16 +295,16 @@ export function detectNames(text) {
   };
 
   const titleRe = new RegExp(
-    `\\b(?:Mr|Mrs|Ms|Miss|Dr|Prof|Atty|Hon|Judge|Justice|Officer|Det|Sgt|Capt|Lt|Col|Gen|Rev|` +
-      `Herr|Frau|Fräulein|Fraeulein|RA|RAin|StA|Notar(?:in)?|Richter(?:in)?)\\.?\\s+` +
-      `${W}(?:\\s+(?:\\p{Lu}\\.?|${W})){0,2}`,
+    `${LB}(?:Mr|Mrs|Ms|Miss|Dr|Prof|Atty|Hon|Judge|Justice|Officer|Det|Sgt|Capt|Lt|Col|Gen|Rev|` +
+      `Herren|Herrn|Herr|Frau|Fräulein|Fraeulein|RA|RAin|StA|Notar(?:in)?|Richter(?:in)?)\\.?\\s+` +
+      `${W}(?:\\s+(?:\\p{Lu}\\.?|${W})){0,2}${RB}`,
     "gu"
   );
   for (let m; (m = titleRe.exec(text)); ) push(m.index, m.index + m[0].length);
 
   // EN "v./vs." and DE "gegen" / " ./. "
   const vRe = new RegExp(
-    `\\b(${W}(?:\\s+${W}){0,3})\\s+(?:v\\.?|vs\\.?|gegen|\\.?\\/\\.?)\\s+(${W}(?:\\s+${W}){0,3})`,
+    `${LB}(${W}(?:\\s+${W}){0,3})\\s+(?:v\\.?|vs\\.?|gegen|\\.?\\/\\.?)\\s+(${W}(?:\\s+${W}){0,3})${RB}`,
     "gu"
   );
   for (let m; (m = vRe.exec(text)); ) {
@@ -250,7 +314,7 @@ export function detectNames(text) {
     if (R) push(R.s, R.e);
   }
 
-  const genRe = new RegExp(`\\b${W}(?:\\s+(?:\\p{Lu}\\.?|${W})){1,3}\\b`, "gu");
+  const genRe = new RegExp(`${LB}${W}(?:\\s+(?:\\p{Lu}\\.?|${W})){1,3}${RB}`, "gu");
   for (let m; (m = genRe.exec(text)); ) {
     const t = trimStops(m[0], m.index);
     if (t && t.n >= 2) push(t.s, t.e);
@@ -276,8 +340,19 @@ export function detectEntities(text) {
         toks.shift();
       }
     }
+    // Drop leading/trailing stop words (months, roles, legal labels, …)
+    while (toks.length && NAME_STOP.has(toks[0].replace(/\.$/, ""))) {
+      start += toks[0].length + 1;
+      toks.shift();
+    }
+    while (toks.length && NAME_STOP.has(toks[toks.length - 1].replace(/\.$/, ""))) {
+      end -= toks[toks.length - 1].length + 1;
+      toks.pop();
+    }
     if (!toks.length) continue;
     if (toks.length === 1 && toks[0].replace(/[^\p{L}\p{N}]/gu, "").length < 2) continue;
+    // Lone stop-word / month must never become an entity (protects „14. Juli 1982“)
+    if (toks.length === 1 && NAME_STOP.has(toks[0].replace(/\.$/, ""))) continue;
     spans.push({ type: "entity", start, end, value: text.slice(start, end) });
   }
   return spans;
@@ -333,7 +408,10 @@ export function linkNameParts(text, spans) {
   }
   const out = [];
   for (const [t, type] of tokenType) {
-    const re = new RegExp(`\\b${t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "gu");
+    const re = new RegExp(
+      `${LB}${t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}${RB}`,
+      "gu"
+    );
     for (let m; (m = re.exec(text)); ) {
       const st = m.index;
       const en = st + m[0].length;
@@ -379,6 +457,16 @@ export function detect(text, enabled, terms = []) {
   }
   if (enabled.entity) spans = spans.concat(detectEntities(text));
   if (enabled.name) spans = spans.concat(detectNames(text));
+  // Drop pure role-label hits; shrink "Beschwerdeführer Klaus Müller" → "Klaus Müller"
+  spans = spans
+    .map((s) => {
+      if (s.type !== "name" && s.type !== "entity") return s;
+      if (ROLE_LABELS.some((r) => r.toLowerCase() === s.value.trim().toLowerCase())) {
+        return null;
+      }
+      return stripLeadingRole(s, text);
+    })
+    .filter(Boolean);
   if (enabled.name || enabled.entity) spans = spans.concat(linkNameParts(text, spans));
   if (terms && terms.length) spans = spans.concat(detectTerms(text, terms));
   return resolveOverlaps(spans);
