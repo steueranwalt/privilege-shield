@@ -125,13 +125,38 @@
   mark.pii.off{background:transparent !important;color:var(--ink-soft);text-decoration:line-through;
     opacity:.65;border-bottom:1px dashed #c4cad8}
   /* per-type colors */
-  mark.name,mark.org{background:#e7f0ff;border-bottom-color:#8fb4ff}
+  mark.name{background:#e7f0ff;border-bottom-color:#8fb4ff}
+  mark.entity{background:#eef3ff;border-bottom-color:#a9c2ff}
+  mark.term{background:#ffe9c7;border-bottom-color:#ffb86b}
   mark.ssn,mark.account,mark.case{background:#ffe9e6;border-bottom-color:#ff9c8f}
   mark.email,mark.phone{background:#e7f7ee;border-bottom-color:#79d3a4}
   mark.address,mark.zip{background:#fff2da;border-bottom-color:#ffce7a}
   mark.date{background:#efe7ff;border-bottom-color:#b79cff}
   mark.money{background:#e6f6fb;border-bottom-color:#7ed4e8}
   mark.other{background:#eceef3;border-bottom-color:#aeb6c7}
+
+  /* ===== "Your terms to redact" — the hero feature ===== */
+  .terms{border:1.5px solid #ffd9a8;background:linear-gradient(180deg,#fffaf2,#fff);
+    border-radius:12px;padding:14px 14px 12px;margin:4px 0 14px}
+  .terms .thd{display:flex;align-items:center;gap:8px;font-size:13.5px;font-weight:700;color:#9a5b14}
+  .terms .thd svg{width:16px;height:16px;flex:0 0 auto}
+  .terms .thelp{font-size:12px;color:var(--ink-soft);margin:3px 0 9px;line-height:1.45}
+  .terms textarea{min-height:58px;border-color:#ffd9a8;background:#fff;font-size:13px}
+  .terms textarea:focus{outline:2px solid #ffe2b8;border-color:#f6a13a}
+  .terms .trow{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:8px;flex-wrap:wrap}
+  .terms .remember{font-size:12px;color:var(--ink-soft);display:flex;align-items:center;gap:6px;cursor:pointer}
+  .terms .remember input{width:14px;height:14px}
+  .termPreview{display:none;margin-top:9px;border:1px solid var(--line);border-radius:9px;background:#fff;overflow:hidden}
+  .termPreview .tp-count{font-size:11.5px;font-weight:700;color:#9a5b14;background:#fff6ea;padding:6px 10px;border-bottom:1px solid #ffe2bf}
+  .termPreview .tp-text{font-size:12.5px;line-height:1.85;padding:9px 11px;max-height:150px;overflow:auto;
+    white-space:pre-wrap;word-break:break-word;font-family:ui-monospace,Menlo,monospace}
+  mark.thl{background:#ffe9c7;border-radius:3px;padding:0 2px}
+  .opts-head{font-size:12.5px;font-weight:700;color:var(--ink);width:100%;margin-top:2px}
+  .finalcheck{font-size:12px;color:#9a5b14;background:#fff8ee;border:1px solid #ffe2bf;
+    border-radius:9px;padding:8px 11px;margin-top:12px;line-height:1.45}
+  .itgrouphdr{font-size:10.5px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;
+    color:var(--ink-soft);margin:10px 0 2px;padding:0 8px}
+  .itgrouphdr:first-child{margin-top:0}
 
   .additem{display:flex;gap:8px;align-items:center;margin-top:10px;flex-wrap:wrap}
   select{font-size:13px;padding:7px 9px;border:1px solid var(--line);border-radius:8px;background:#fff}
@@ -209,8 +234,9 @@
 <section class="hero">
   <div class="wrap">
     <h1>Your client never enters the room.</h1>
-    <p class="sub">Strip every identifier before your text touches Claude, ChatGPT, or any
-      AI — and restore the real names locally after. Your documents are never uploaded — not even to us.</p>
+    <p class="sub">Catch the identifiers in your text before AI sees them — names, numbers, dates,
+      and any terms you add — then restore them locally. Review before you rely on it.
+      Your documents are never uploaded — not even to us.</p>
     <div class="trustchips">
       <span class="chip"><svg viewBox="0 0 24 24" fill="none" stroke="#0f8a5f" stroke-width="2"><path d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6z"/><path d="M9 12l2 2 4-4"/></svg>Runs entirely in your browser</span>
       <a class="chip" href="https://github.com/ann892/privilege-shield" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" fill="none" stroke="#1f6feb" stroke-width="2"><path d="M8 17l-5-5 5-5"/><path d="M16 7l5 5-5 5"/></svg>Open source — read the code</a>
@@ -231,10 +257,25 @@
       <label class="fld" for="rawInput">Your text (with client details)</label>
       <textarea id="rawInput" placeholder="Paste the text you want to send to an AI tool…"></textarea>
 
+      <!-- ===== FIX 1: Custom terms — the hero feature ===== -->
+      <div class="terms">
+        <div class="thd"><svg viewBox="0 0 24 24" fill="none" stroke="#f6a13a" stroke-width="2"><path d="M12 3l7 3v5c0 4.6-3 8.3-7 10-4-1.7-7-5.4-7-10V6z"/><path d="M9 12l2 2 4-4"/></svg> Your terms to redact</div>
+        <div class="thelp">Add client names, opposing parties, codenames, product names, deal figures —
+          anything specific to your matter. Separate with commas or new lines. <b>You decide what counts as sensitive.</b></div>
+        <textarea id="customTerms" placeholder="e.g.  Samsung, Qualcomm, Snapdragon, Project Falcon, $20B"></textarea>
+        <div class="trow">
+          <label class="remember" title="Stored only in this browser — never uploaded"><input type="checkbox" id="termsRemember"> Remember on this device</label>
+          <span class="small" id="termsHint">Terms persist for this session automatically.</span>
+        </div>
+        <div class="termPreview" id="termPreview"></div>
+      </div>
+
       <div class="opts" id="typeOpts">
-        <strong class="small" style="width:100%;color:var(--ink)">Detect:</strong>
+        <strong class="opts-head">…and auto-detect the obvious identifiers:</strong>
         <!-- checkboxes injected by JS -->
       </div>
+      <p class="finalcheck">This flags what it can and lets you add the rest. Always review the
+        redactions before sending anything to an AI — <b>you're the final check.</b></p>
 
       <div class="btnrow">
         <button class="btn" id="detectBtn">Detect PII</button>
@@ -369,6 +410,7 @@
 /* --- type metadata: placeholder prefix, label, swatch color, overlap priority.
    Higher priority wins when two detections overlap. ------------------------ */
 const TYPES = {
+  term:    {prefix:"TERM",     label:"Your term",     color:"#ffb86b", priority:140},
   other:   {prefix:"REDACTED", label:"Manual",        color:"#aeb6c7", priority:130},
   email:   {prefix:"EMAIL",    label:"Email",         color:"#79d3a4", priority:100},
   ssn:     {prefix:"SSN",      label:"SSN",           color:"#ff9c8f", priority:95},
@@ -377,13 +419,14 @@ const TYPES = {
   date:    {prefix:"DATE",     label:"Date",          color:"#b79cff", priority:86},
   account: {prefix:"ACCOUNT",  label:"Account/Routing",color:"#ff9c8f",priority:85},
   money:   {prefix:"AMOUNT",   label:"Dollar amount", color:"#7ed4e8", priority:80},
-  org:     {prefix:"ENTITY",   label:"Org/Entity",    color:"#8fb4ff", priority:75},
   address: {prefix:"ADDRESS",  label:"Address",       color:"#ffce7a", priority:70},
   name:    {prefix:"CLIENT",   label:"Name",          color:"#8fb4ff", priority:50},
+  entity:  {prefix:"ENTITY",   label:"Possible name/entity", color:"#a9c2ff", priority:45},
   zip:     {prefix:"ZIP",      label:"ZIP",           color:"#ffce7a", priority:40},
 };
-/* Which categories the user can toggle on/off before detecting. */
-const TOGGLEABLE = ["name","org","ssn","email","phone","address","zip","date","account","case","money"];
+/* Which categories the user can toggle on/off before detecting.
+   (term is always-on via the "Your terms" box; other is manual-only.) */
+const TOGGLEABLE = ["name","entity","ssn","email","phone","address","zip","date","account","case","money"];
 
 /* ---------------------------------------------------------------------------
    DETECTORS — each returns an array of {type,start,end,value} for a given text.
@@ -400,12 +443,16 @@ const REGEX_DETECTORS = [
   // case / docket numbers like 3:25-cv-01199, plus "Case No. ..." captions
   {type:"case",   re:/\b\d{1,2}:\d{2}-[A-Za-z]{2,4}-\d{3,6}\b/g},
   {type:"case",   re:/\b(?:Case|Docket|Civil Action)\s*(?:No\.?|Number)?\s*[:#]?\s*[\dA-Za-z][\dA-Za-z\-:]{3,}\b/g},
-  // money: $ amounts (with or without commas/cents)
-  {type:"money",  re:/\$\s?\d[\d,]*(?:\.\d{1,2})?\b/g},
-  // dates: numeric m/d/y, ISO y-m-d, and "Month D, YYYY"
+  // money: $1,200 · $20B · $20.5M · $20 billion · 20 million dollars
+  {type:"money",  re:/\$\s?\d[\d,]*(?:\.\d+)?(?:\s?(?:hundred|thousand|million|billion|trillion|bn|mn|[kmbt]))?\b/gi},
+  {type:"money",  re:/\b\d[\d,]*(?:\.\d+)?\s?(?:hundred|thousand|million|billion|trillion)\s+dollars?\b/gi},
+  // dates: numeric m/d/y, ISO y-m-d, "Month D, YYYY", "Month YYYY", year ranges, and BARE YEARS
   {type:"date",   re:/\b(?:0?[1-9]|1[0-2])[\/\-](?:0?[1-9]|[12]\d|3[01])[\/\-](?:\d{4}|\d{2})\b/g},
   {type:"date",   re:/\b\d{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\d|3[01])\b/g},
   {type:"date",   re:/\b(?:January|February|March|April|May|June|July|August|September|October|November|December|Jan|Feb|Mar|Apr|Jun|Jul|Aug|Sept?|Oct|Nov|Dec)\.?\s+\d{1,2}(?:st|nd|rd|th)?,?\s+\d{4}\b/gi},
+  {type:"date",   re:/\b(?:January|February|March|April|May|June|July|August|September|October|November|December|Jan|Feb|Mar|Apr|Jun|Jul|Aug|Sept?|Oct|Nov|Dec)\.?\s+(?:19|20)\d{2}\b/gi},
+  {type:"date",   re:/\b(?:19|20)\d{2}\s?(?:[-–—]|to)\s?(?:19|20)?\d{2}\b/g},  // year range 2018-2020
+  {type:"date",   re:/\b(?:19|20)\d{2}\b/g},                                            // bare year (over-flag)
   // street address: number + words + street-type suffix (+ optional unit)
   {type:"address",re:/\b\d{1,6}\s+(?:[A-Z][A-Za-z.'\-]+\s+){1,4}(?:Street|St|Avenue|Ave|Road|Rd|Boulevard|Blvd|Lane|Ln|Drive|Dr|Court|Ct|Way|Place|Pl|Terrace|Ter|Circle|Cir|Highway|Hwy|Parkway|Pkwy|Square|Sq|Trail|Trl)\b\.?(?:,?\s*(?:Apt|Suite|Ste|Unit|#)\s*\.?\s*[\w\-]+)?/g},
   // account / routing: a run of 7–17 digits, possibly grouped with - or spaces
@@ -413,8 +460,6 @@ const REGEX_DETECTORS = [
                   valid:m=>{const d=(m.match(/\d/g)||[]).length; return d>=7&&d<=17;}},
   // ZIP: 5 digits or ZIP+4
   {type:"zip",    re:/\b\d{5}(?:-\d{4})?\b/g},
-  // org / entity: capitalized word(s) ending in a company/legal suffix → "Smith LLC", "Acme Corp"
-  {type:"org",    re:/\b[A-Z][A-Za-z0-9&.'\-]*(?:\s+(?:&|[A-Z][A-Za-z0-9&.'\-]*)){0,4}\s+(?:LLC|L\.L\.C\.|Inc\.?|Incorporated|Corp\.?|Corporation|LLP|L\.L\.P\.|PLLC|P\.?C\.?|L\.?P\.?|Co\.?|Company|Ltd\.?|Trust|Partners|Group|Associates|Holdings|Ventures|Capital|Foundation|Bancorp|Bank|Insurance)\b/g},
 ];
 
 /* Words that, on their own, should not anchor a "name" detection.
@@ -471,34 +516,95 @@ function detectNames(text){
   return spans;
 }
 
+/* Capitalized function-words that, when they START a sentence, are NOT entities
+   (so "Despite Samsung…" doesn't flag "Despite"). NOT geographic/business words —
+   those (South, American, Bank, United…) are exactly what we WANT to flag. */
+const COMMON_CAP = new Set((
+  "The A An And But Or Nor So Yet If When While Where Whereas Because Since As Although Though However Despite Whether Unless Until After Before During Once Meanwhile Moreover Furthermore Additionally Overall Instead Rather Otherwise "+
+  "In On At To From With By Of Off Up Down Over Under Into Onto Per Via Plus Minus Throughout Among Between Against About Around Through Within Without "+
+  "This That These Those It Its He She They We You I His Her Their Our My Your Them Us Him Me We "+
+  "Then Thus Therefore Also There Here Now Later Next First Second Third Finally Still Even Just Only Both Either Neither Each Every All Most More Less Many Few Some Any No Not Such Other Another Same Several "+
+  "Mr Mrs Ms Miss Dr Prof Re Dear Sincerely Regards Yes Ok Okay Please Thanks Thank Hi Hello Hey Note Per Despite Given"
+).split(/\s+/).map(w=>w.toLowerCase()));
+
+/* FIX 2 — Entity / proper-noun candidates: capitalized words and runs of them.
+   Catches company/product/place names (Samsung, Qualcomm, Snapdragon, South
+   American). Over-flags ON PURPOSE; the human review removes false positives.
+   Skips a capitalized common word only when it begins a sentence. */
+function detectEntities(text){
+  const spans = [];
+  const re = /[A-Z][A-Za-z0-9&'’\-]*(?:\s+[A-Z][A-Za-z0-9&'’\-]*)*/g;
+  for(let m; (m=re.exec(text)); ){
+    let start = m.index, end = start + m[0].length;
+    let toks = m[0].split(/\s+/);
+    const before = text.slice(0, start);
+    const sentInit = /(?:^|[.!?:;]\s*|\n\s*|["'(‘“]\s*)$/.test(before);
+    // strip leading sentence-initial function words ("Despite Samsung" → "Samsung")
+    if(sentInit){
+      while(toks.length && COMMON_CAP.has(toks[0].toLowerCase().replace(/[.'’\-]+$/,""))){
+        start += toks[0].length + 1; toks.shift();
+      }
+    }
+    if(!toks.length) continue;
+    // skip a lone 1-letter token ("I", "A")
+    if(toks.length===1 && toks[0].replace(/[^A-Za-z0-9]/g,"").length < 2) continue;
+    spans.push({type:"entity", start, end, value:text.slice(start,end)});
+  }
+  return spans;
+}
+
+/* FIX 1 — Custom terms: match the user's exact terms, case-insensitive, whole-word.
+   Works for plain words, multi-word phrases ("South American"), and symbols ("$20B").
+   Every case variant of a term shares ONE placeholder (gkey) and restores to the
+   term as the user typed it (display). */
+function detectTerms(text, terms){
+  const spans = [];
+  for(const raw of terms){
+    const t = raw.trim();
+    if(!t) continue;
+    const esc = t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    let re;
+    try { re = new RegExp("(?<![A-Za-z0-9])"+esc+"(?![A-Za-z0-9])", "gi"); }   // whole-word-ish
+    catch(e){ re = new RegExp(esc, "gi"); }                                     // fallback (older engines)
+    for(let m; (m=re.exec(text)); ){
+      if(m[0].length===0){ re.lastIndex++; continue; }
+      spans.push({type:"term", start:m.index, end:m.index+m[0].length, value:m[0],
+                  gkey:"term:"+t.toLowerCase(), display:t});
+    }
+  }
+  return spans;
+}
+
 /* Name-part linking: once a fuller name or entity is detected (e.g. "Catherine
    Mills", "Smith LLC"), also catch BARE later occurrences of its significant
    parts ("Catherine", "Mills", "Smith") so single-word references don't slip. */
 function linkNameParts(text, spans){
   const SUFFIX = /^(LLC|Inc|Incorporated|Corp|Corporation|LLP|PLLC|PC|LP|Co|Company|Ltd|Trust|Partners|Group|Associates|Holdings|Ventures|Capital|Foundation|Bancorp|Bank|Insurance)\.?$/i;
-  const tokens = new Set();
+  const tokenType = new Map();
   for(const s of spans){
-    if(s.type!=="name" && s.type!=="org") continue;
+    if(s.type!=="name" && s.type!=="entity") continue;
     for(const raw of s.value.split(/\s+/)){
-      const t = raw.replace(/^[^A-Za-z]+|[^A-Za-z]+$/g,"");
-      if(t.length>=3 && /^[A-Z]/.test(t) && !NAME_STOP.has(t.replace(/\.$/,"")) && !SUFFIX.test(t)) tokens.add(t);
+      const t = raw.replace(/^[^A-Za-z0-9]+|[^A-Za-z0-9]+$/g,"");
+      if(t.length>=3 && /^[A-Z]/.test(t) && !NAME_STOP.has(t.replace(/\.$/,"")) && !SUFFIX.test(t)){
+        if(!tokenType.has(t) || s.type==="name") tokenType.set(t, s.type);
+      }
     }
   }
   const out = [];
-  for(const t of tokens){
+  for(const [t,type] of tokenType){
     const re = new RegExp("\\b"+t.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")+"\\b","g");
     for(let m; (m=re.exec(text)); ){
       const st=m.index, en=st+m[0].length;
       if(spans.some(sp=>st<sp.end && en>sp.start)) continue;   // already covered by a fuller match
       if(out.some(sp=>st<sp.end && en>sp.start)) continue;
-      out.push({type:"name", start:st, end:en, value:m[0]});
+      out.push({type, start:st, end:en, value:m[0]});
     }
   }
   return out;
 }
 
-/* Run all enabled detectors, then resolve overlaps. */
-function detect(text, enabled){
+/* Run all enabled detectors + custom terms, then resolve overlaps. */
+function detect(text, enabled, terms){
   let spans = [];
   for(const d of REGEX_DETECTORS){
     if(!enabled[d.type]) continue;
@@ -509,9 +615,12 @@ function detect(text, enabled){
       spans.push({type:d.type, start:m.index, end:m.index+v.length, value:v});
     }
   }
-  if(enabled.name) spans = spans.concat(detectNames(text));
+  if(enabled.entity) spans = spans.concat(detectEntities(text));
+  if(enabled.name)   spans = spans.concat(detectNames(text));
   // catch bare single-word references to any detected person/entity name
-  if(enabled.name) spans = spans.concat(linkNameParts(text, spans));
+  if(enabled.name || enabled.entity) spans = spans.concat(linkNameParts(text, spans));
+  // custom terms are ALWAYS applied (the user's own list) and win over everything
+  if(terms && terms.length) spans = spans.concat(detectTerms(text, terms));
   return resolveOverlaps(spans);
 }
 
@@ -545,9 +654,9 @@ function regroup(spans, prev){
   if(prev) prev.forEach(it => prevEnabled[it.key] = it.enabled);
   const byKey = new Map();
   for(const s of spans){
-    const key = s.type + " " + s.value.trim();
+    const key = s.gkey || (s.type + " " + s.value.trim());
     if(!byKey.has(key)){
-      byKey.set(key, {id:"it"+(itemSeq++), type:s.type, value:s.value.trim(), key,
+      byKey.set(key, {id:"it"+(itemSeq++), type:s.type, value:(s.display||s.value).trim(), key,
                       enabled: key in prevEnabled ? prevEnabled[key] : true, placeholder:null, occ:[]});
     }
     byKey.get(key).occ.push({start:s.start, end:s.end});
@@ -599,19 +708,30 @@ function renderPreview(){
 
 function renderItems(){
   const box = $("itemsList");
-  if(!items.length){ box.innerHTML = '<div class="empty">No PII detected. Review the text yourself before trusting it.</div>'; }
+  if(!items.length){ box.innerHTML = '<div class="empty">Nothing flagged. Add your own terms above, or select text below to redact it — and review the text yourself before trusting it.</div>'; }
   else {
-    box.innerHTML = items.map(it=>{
+    const row = it=>{
       const occ = it.occ.length>1 ? ' ×'+it.occ.length : '';
       return '<label class="itrow">'+
         '<input type="checkbox" data-item="'+it.id+'" '+(it.enabled?"checked":"")+'>'+
         '<span class="swatch" style="background:'+TYPES[it.type].color+'"></span>'+
-        '<span class="ittype">'+esc(TYPES[it.type].label)+'</span>'+
         '<span class="itval" title="'+esc(it.value)+'">'+esc(it.value)+'</span>'+
         '<span class="itcount">'+occ+'</span>'+
         '<span class="itph">'+(it.enabled&&it.placeholder?esc(it.placeholder):'—')+'</span>'+
       '</label>';
-    }).join("");
+    };
+    // group by type, in TYPES declaration order (terms first, then entities, etc.)
+    const order = Object.keys(TYPES);
+    const byType = {};
+    for(const it of items){ (byType[it.type] = byType[it.type] || []).push(it); }
+    let html = "";
+    for(const t of order){
+      if(!byType[t]) continue;
+      const n = byType[t].length;
+      html += '<div class="itgrouphdr">'+esc(TYPES[t].label)+(n>1?' ('+n+')':'')+'</div>';
+      html += byType[t].map(row).join("");
+    }
+    box.innerHTML = html;
   }
   const n = items.filter(i=>i.enabled).length;
   $("itemsCount").textContent = "("+n+" will be redacted)";
@@ -631,10 +751,50 @@ function getEnabledTypes(){
   return enabled;
 }
 
+/* --- custom terms (FIX 1) --- */
+function parseTerms(str){
+  return [...new Set((str||"").split(/[,\n]/).map(t=>t.trim()).filter(Boolean))];
+}
+function renderTermPreview(){
+  const terms = parseTerms($("customTerms").value);
+  const text = $("rawInput").value;
+  const box = $("termPreview");
+  if(!terms.length || !text.trim()){ box.style.display="none"; box.innerHTML=""; return; }
+  const spans = detectTerms(text, terms).sort((a,b)=>a.start-b.start);
+  let html="", cur=0;
+  for(const s of spans){ if(s.start<cur) continue; html+=esc(text.slice(cur,s.start))+'<mark class="thl">'+esc(text.slice(s.start,s.end))+'</mark>'; cur=s.end; }
+  html += esc(text.slice(cur));
+  const count = spans.length;
+  box.style.display="block";
+  box.innerHTML = '<div class="tp-count">'+(count? (count+' match'+(count===1?'':'es')+' for your term'+(terms.length===1?'':'s')+' — these will be redacted') : 'No matches yet for your terms')+'</div>'+
+                  '<div class="tp-text">'+html+'</div>';
+}
+/* persistence — sessionStorage for the session; localStorage only if "remember" is on.
+   These are LOCAL storage only; nothing is ever uploaded. */
+const TERMS_KEY="ps-terms", REMEMBER_KEY="ps-terms-remember";
+function saveTerms(){
+  const v=$("customTerms").value;
+  try{
+    sessionStorage.setItem(TERMS_KEY, v);
+    if($("termsRemember").checked){ localStorage.setItem(REMEMBER_KEY,"1"); localStorage.setItem(TERMS_KEY, v); }
+    else { localStorage.removeItem(REMEMBER_KEY); localStorage.removeItem(TERMS_KEY); }
+  }catch(e){}
+}
+function loadTerms(){
+  try{
+    const remember = localStorage.getItem(REMEMBER_KEY)==="1";
+    $("termsRemember").checked = remember;
+    let v = remember ? localStorage.getItem(TERMS_KEY) : null;
+    if(v==null) v = sessionStorage.getItem(TERMS_KEY);
+    if(v){ $("customTerms").value = v; }
+  }catch(e){}
+}
+
 function runDetect(){
   currentText = $("rawInput").value;
   if(!currentText.trim()){ alert("Paste some text first."); return; }
-  items = regroup(detect(currentText, getEnabledTypes()), null);
+  const terms = parseTerms($("customTerms").value);
+  items = regroup(detect(currentText, getEnabledTypes(), terms), null);
   rerender();
   $("reviewArea").style.display = "block";
   $("outWrap").style.display = "none";
@@ -664,8 +824,12 @@ function addSelection(){
   for(const it of items) for(const o of it.occ){ if(a < o.end && b > o.start){ alert("That overlaps an item already detected."); return; } }
   const type = $("addType").value;
   const spans = [];
-  for(const it of items) for(const o of it.occ) spans.push({type:it.type, start:o.start, end:o.end, value:currentText.slice(o.start,o.end)});
-  spans.push({type, start:a, end:b, value:currentText.slice(a,b)});
+  // rebuild from existing items, preserving each item's grouping identity (gkey) and display value
+  for(const it of items) for(const o of it.occ) spans.push({type:it.type, start:o.start, end:o.end, value:currentText.slice(o.start,o.end), gkey:it.key, display:it.value});
+  const sel2 = currentText.slice(a,b);
+  spans.push(type==="term"
+    ? {type:"term", start:a, end:b, value:sel2, gkey:"term:"+sel2.toLowerCase(), display:sel2}
+    : {type, start:a, end:b, value:sel2});
   items = regroup(spans, items);
   rerender();
   sel.removeAllRanges();
@@ -754,6 +918,7 @@ function clearAll(){
   $("reviewArea").style.display="none"; $("outWrap").style.display="none";
   $("restoreOutWrap").style.display="none"; $("restoreNotice").innerHTML="";
   updateKeyView();
+  renderTermPreview();   // keeps your saved terms; just clears the doc preview
 }
 
 const EXAMPLE =
@@ -837,20 +1002,17 @@ async function submitKit(ev){
    WIRE-UP
    --------------------------------------------------------------------------- */
 function buildTypeOptions(){
-  // detection toggles
+  // detection toggles — ALL on by default (over-flag), the user unchecks what they don't want
   const optBox = $("typeOpts");
   TOGGLEABLE.forEach(t=>{
-    const id="opt_"+t;
     const lab=document.createElement("label");
-    lab.innerHTML='<input type="checkbox" data-opt="'+t+'" id="'+id+'" '+(t==="money"?"":"checked")+(t==="money"?"":"")+'> '+TYPES[t].label;
+    lab.innerHTML='<input type="checkbox" data-opt="'+t+'" id="opt_'+t+'" checked> '+TYPES[t].label;
     optBox.appendChild(lab);
   });
-  // default money ON too (over-flag); flip the attribute set above:
-  const moneyCb=document.querySelector('input[data-opt="money"]'); if(moneyCb) moneyCb.checked=true;
 
-  // manual add type dropdown
+  // manual add type dropdown ("redact this too")
   const sel=$("addType");
-  ["name","ssn","email","phone","address","zip","date","account","case","money","other"].forEach(t=>{
+  ["term","name","entity","ssn","email","phone","address","zip","date","account","case","money","other"].forEach(t=>{
     const o=document.createElement("option"); o.value=t; o.textContent=TYPES[t].label; sel.appendChild(o);
   });
   sel.value="other";
@@ -863,12 +1025,19 @@ function netStatus(){
 
 window.addEventListener("DOMContentLoaded", ()=>{
   buildTypeOptions();
+  loadTerms();
   netStatus();
   window.addEventListener("online", netStatus);
   window.addEventListener("offline", netStatus);
 
+  // custom terms (FIX 1): persist + live highlight as the user types
+  $("customTerms").addEventListener("input", ()=>{ saveTerms(); renderTermPreview(); });
+  $("termsRemember").addEventListener("change", saveTerms);
+  $("rawInput").addEventListener("input", renderTermPreview);
+  renderTermPreview();
+
   $("detectBtn").addEventListener("click", runDetect);
-  $("exampleBtn").addEventListener("click", ()=>{ $("rawInput").value=EXAMPLE; runDetect(); });
+  $("exampleBtn").addEventListener("click", ()=>{ $("rawInput").value=EXAMPLE; renderTermPreview(); runDetect(); });
   $("clearAllBtn").addEventListener("click", clearAll);
   $("addSelBtn").addEventListener("click", addSelection);
   $("redactBtn").addEventListener("click", runRedact);
