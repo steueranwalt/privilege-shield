@@ -63,6 +63,27 @@ which is what makes restore reliable.
 **Not supported in v1:** PDFs (hidden text-layer and metadata failure modes — out of
 scope on purpose). Text only.
 
+## Batch CLI (English + German)
+
+For large folders, use the local CLI under [`cli/`](cli/) — same offline model,
+shared placeholders across files, **English and German** detectors (IBAN, Aktenzeichen,
+Straße, `gegen`, umlaut names, € amounts, etc.).
+
+```bash
+cd cli
+node bin/privilege-shield.js anonymize ../inbox/ \
+  --out ../redacted/ \
+  --key ../secrets/ps-key.json
+
+# Cursor agent: work only on redacted/ — never clone cleartext or the key
+node bin/privilege-shield.js deanonymize ../redacted/ \
+  --out ../restored/ \
+  --key ../secrets/ps-key.json
+```
+
+See [`cli/README.md`](cli/README.md) for the full Cursor workflow. The key file is a
+secret: keep it outside any repo a cloud agent can access.
+
 ---
 
 > Review every redaction before use. You remain responsible for protecting client

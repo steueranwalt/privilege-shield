@@ -1,2 +1,12 @@
 .DS_Store
 .vercel
+
+# Privilege Shield CLI — never commit secrets or cleartext client corpora
+secrets/
+*.ps-key.json
+**/ps-key.json
+inbox/
+cleartext/
+restored/
+.redacted-work/
+node_modules/
